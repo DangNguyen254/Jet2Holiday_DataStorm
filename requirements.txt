@@ -1,0 +1,58 @@
+# Data Processing
+pandas
+numpy
+polars  # Fast alternative to pandas
+
+# Database & Storage
+psycopg2-binary  # PostgreSQL
+sqlalchemy
+boto3  # AWS SDK
+delta-spark  # Delta Lake
+
+# Data Quality
+great-expectations
+pandera
+
+# Feature Engineering
+feature-engine
+featuretools
+
+# ML Frameworks
+scikit-learn
+lightgbm
+xgboost
+catboost
+
+# Deep Learning
+torch
+pytorch-lightning
+pytorch-forecasting
+
+# MLOps
+mlflow
+feast
+optuna  # Hyperparameter tuning
+
+# API & Web
+fastapi
+uvicorn
+streamlit
+pydantic
+
+# Orchestration
+apache-airflow
+prefect
+
+# Monitoring
+prometheus-client
+evidently
+
+# Visualization
+plotly
+matplotlib
+seaborn
+
+# Utilities
+python-dotenv
+tqdm
+joblib
