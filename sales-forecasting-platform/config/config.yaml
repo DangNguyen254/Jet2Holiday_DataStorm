@@ -1,0 +1,4 @@
+app:
+  name: "Jet2Holiday - Sales Forecasting Platform"
+  version: "1.0.0"
+  environment: "development"
