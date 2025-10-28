@@ -3,3 +3,8 @@ venv/
 *.pyc
 __pycache__/
 .ipynb_checkpoints/
+data/
+ml_pipeline/Model_training/logs/
+ml_pipeline/Model_training/mlruns/
+ml_pipeline/Model_training/models/
+ml_pipeline/Model_training/outputs/

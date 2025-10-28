@@ -1,0 +1,14 @@
+artifact_uri: file:///D:/Code/Jet2Holiday_DataStorm/sales-forecasting-platform/ml_pipeline/Model_training/mlruns/837043814617191742/b7e123645692477bb89e9eac4f70a92f/artifacts
+end_time: 1761578868165
+entry_point_name: ''
+experiment_id: '837043814617191742'
+lifecycle_stage: active
+run_id: b7e123645692477bb89e9eac4f70a92f
+run_name: two_stage_pipeline
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1761578868133
+status: 4
+tags: []
+user_id: ASUS
