@@ -5,12 +5,14 @@ import logging
 import mlflow
 from feature_engineer import FeatureEngineer
 from demand_recovery import CensoredDemandRecovery
-from forcasting_model import ForecastingModel
+from forecasting_model import ForecastingModel
 import sys
-from scripts.load_data import download_freshretail as load_data
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# MLFLOW_TRACKING_URI = "http://localhost:5000"
+# mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 def run_complete_pipeline():
     logger.info("="*80)
@@ -46,13 +48,38 @@ def run_complete_pipeline():
             }
         }
         
-        engineer = FeatureEngineer(config=feature_config)
-        train_features, feature_names = engineer.run_full_pipeline(train_df)
-        eval_features, _ = engineer.run_full_pipeline(eval_df)
+        # Create processed data directory
+        processed_dir = project_root / 'data' / 'processed'
+        processed_dir.mkdir(parents=True, exist_ok=True)
         
-        mlflow.log_param("num_features", len(feature_names))
-        train_features.to_parquet('data/processed/train_features.parquet', index=False)
-        eval_features.to_parquet('data/processed/eval_features.parquet', index=False)
+        # Define output file paths
+        train_features_path = processed_dir / 'train_features.parquet'
+        eval_features_path = processed_dir / 'eval_features.parquet'
+        
+        # Initialize and run feature engineering
+        engineer = FeatureEngineer(config=feature_config)
+        
+        try:
+            logger.info("\n[2/6] Running feature engineering on training data...")
+            train_features, feature_names = engineer.run_full_pipeline(train_df)
+            
+            logger.info("\n[2.5/6] Running feature engineering on evaluation data...")
+            eval_features, _ = engineer.run_full_pipeline(eval_df)
+            
+            #Log number of features
+            mlflow.log_param("num_features", len(feature_names))
+            logger.info(f"Generated {len(feature_names)} features")
+            
+            # Save processed data
+            logger.info(f"\nSaving processed data to {processed_dir}")
+            train_features.to_parquet(train_features_path, index=False)
+            eval_features.to_parquet(eval_features_path, index=False)
+            
+        except Exception as e:
+            logger.error(f"Error during feature engineering: {str(e)}")
+            raise
+        logger.info(f"Saved processed training data to {train_features_path}")
+        logger.info(f"Saved processed evaluation data to {eval_features_path}")
         
         logger.info("\n[3/6] Stage 1: Censored Demand Recovery...")
         recovery = CensoredDemandRecovery()
@@ -63,9 +90,30 @@ def run_complete_pipeline():
         mlflow.log_artifact('models/recovery_model.pkl')
         
         logger.info("\n[4/6] Stage 2: Training Forecasting Model...")
-        X_train = train_features[feature_names]
+        
+        # Ensure both train and eval have the same columns
+        all_columns = set(train_features.columns).union(set(eval_features.columns))
+        for col in all_columns:
+            if col not in train_features.columns:
+                train_features[col] = 0
+            if col not in eval_features.columns:
+                eval_features[col] = 0
+        
+        # Make sure feature_names only contains columns that exist in the data
+        valid_feature_names = [f for f in feature_names if f in train_features.columns and f in eval_features.columns]
+        missing_features = set(feature_names) - set(valid_feature_names)
+        
+        if missing_features:
+            logger.warning(f"The following features are missing from the data and will be excluded: {missing_features}")
+        
+        # Ensure we have the target column
+        if 'recovered_demand' not in train_features.columns or 'recovered_demand' not in eval_features.columns:
+            raise ValueError("'recovered_demand' column is missing from the data")
+        
+        # Select only the valid features and target
+        X_train = train_features[valid_feature_names]
         y_train = train_features['recovered_demand']
-        X_eval = eval_features[feature_names]
+        X_eval = eval_features[valid_feature_names]
         y_eval = eval_features['recovered_demand']
         
         split_idx = int(len(X_train) * 0.8)
@@ -77,12 +125,12 @@ def run_complete_pipeline():
         forecaster = ForecastingModel()
         
         logger.info("\nOptimizing hyperparameters...")
-        best_params = forecaster.optimize_hyperparameters(
-            X_train_split, y_train_split,
-            n_trials=30
-        )
+        # best_params = forecaster.optimize_hyperparameters(
+        #     X_train_split, y_train_split,
+        #     n_trials=30
+        # )
         
-        mlflow.log_params(best_params)
+        #mlflow.log_params(best_params)
         forecaster.train_final_model(X_train_split, y_train_split, X_val, y_val)
         forecaster.save_model('models/forecasting_model.pkl')
         mlflow.log_artifact('models/forecasting_model.pkl')
@@ -96,14 +144,12 @@ def run_complete_pipeline():
         y_eval_observed = eval_features['sale_amount']
         
         baseline_model = ForecastingModel()
-        baseline_model.best_params = best_params
+        #baseline_model.best_params = best_params
         baseline_model.train_final_model(X_train_split, y_train_observed.iloc[:split_idx])
         
         baseline_metrics = baseline_model.evaluate(X_eval, y_eval_observed)
         
-        logger.info("\n" + "="*80)
-        logger.info("RESULTS COMPARISON")
-        logger.info("="*80)
+        logger.info("\nRESULTS COMPARISON")
         logger.info("\nTwo-Stage Pipeline (with demand recovery):")
         for metric, value in metrics.items():
             logger.info(f"  {metric.upper()}: {value:.4f}")
@@ -115,12 +161,9 @@ def run_complete_pipeline():
         mape_improvement = (baseline_metrics['mape'] - metrics['mape']) / baseline_metrics['mape'] * 100
         bias_reduction = abs(baseline_metrics['bias_pct']) - abs(metrics['bias_pct'])
         
-        logger.info("\n" + "="*80)
-        logger.info("KEY IMPROVEMENTS")
-        logger.info("="*80)
+        logger.info("\nKEY IMPROVEMENTS")
         logger.info(f"  MAPE Improvement: {mape_improvement:.2f}%")
         logger.info(f"  Bias Reduction: {bias_reduction:.2f} percentage points")
-        logger.info("="*80)
         
         mlflow.log_metric("mape_improvement_pct", mape_improvement)
         mlflow.log_metric("bias_reduction", bias_reduction)

@@ -7,7 +7,6 @@ import joblib
 import logging
 
 logger = logging.getLogger(__name__)
-
 class CensoredDemandRecovery:
     def __init__(self):
         self.recovery_model = None
@@ -18,22 +17,74 @@ class CensoredDemandRecovery:
         
         if 'is_any_stockout' not in df.columns:
             df['is_any_stockout'] = (df['stockout_hours_count'] > 0).astype(int)
-        
         stockout_rate = df['is_any_stockout'].mean()
         logger.info(f"Overall stockout rate: {stockout_rate*100:.2f}%")
-        
         return df
     
+    def _preprocess_features(self, df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
+        df = df.copy()
+
+        datetime_cols = df.select_dtypes(include=['datetime64[ns]']).columns
+        for col in datetime_cols:
+            df[f'{col}_year'] = df[col].dt.year
+            df[f'{col}_month'] = df[col].dt.month
+            df[f'{col}_day'] = df[col].dt.day
+            df[f'{col}_dayofweek'] = df[col].dt.dayofweek
+            df[f'{col}_hour'] = df[col].dt.hour
+        
+        df = df.drop(columns=datetime_cols, errors='ignore')
+        categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+        for col in categorical_cols:
+            df[col] = df[col].astype('category').cat.codes
+        one_hot_patterns = {
+            'temperature_category': [0, 1, 2],
+            'precipitation_category': [0, 1, 2],
+            'humidity_category': [0, 1, 2],
+            'wind_category': [0, 1]
+        }
+        
+        for prefix, indices in one_hot_patterns.items():
+            for i in indices:
+                col_name = f"{prefix}_{i}"
+                if col_name in feature_cols and col_name not in df.columns:
+                    df[col_name] = 0
+                    logger.debug(f"Added missing one-hot encoded column: {col_name}")
+        
+        # Only keep columns that are in feature_cols
+        valid_cols = [col for col in feature_cols if col in df.columns]
+        missing_cols = [col for col in feature_cols if col not in valid_cols]
+        
+        if missing_cols:
+            logger.warning(f"The following features were not found and couldn't be imputed: {missing_cols}")
+        # Ensure all columns are present and in the correct order
+        result_df = pd.DataFrame()
+        for col in feature_cols:
+            if col in df.columns:
+                result_df[col] = df[col]
+            else:
+                # If we get here, it's a non-one-hot column that's missing
+                logger.warning(f"Could not find or impute column: {col}")
+                result_df[col] = 0  # Impute with 0 as a last resort    
+        return result_df
+        
     def train_recovery_model(self, df: pd.DataFrame, feature_cols: list) -> lgb.LGBMRegressor:
         logger.info("STAGE 1: TRAINING DEMAND RECOVERY MODEL")
+        
+        # Check if required columns exist
+        if 'is_any_stockout' not in df.columns:
+            raise ValueError("Column 'is_any_stockout' not found in the input DataFrame")
+            
+        if 'sale_amount' not in df.columns:
+            available_cols = ', '.join(df.columns.tolist())
+            raise ValueError(f"Column 'sale_amount' not found in the input DataFrame. Available columns: {available_cols}")
         
         clean_data = df[df['is_any_stockout'] == 0].copy()
         
         logger.info(f"\nClean data (no stockouts): {len(clean_data):,} rows")
         logger.info(f"Stockout data: {len(df[df['is_any_stockout'] == 1]):,} rows")
         
-        # Prepare features
-        X_clean = clean_data[feature_cols]
+        # Preprocess features
+        X_clean = self._preprocess_features(clean_data, feature_cols)
         y_clean = clean_data['sale_amount']
         
         # Train-test split
@@ -81,9 +132,7 @@ class CensoredDemandRecovery:
         return self.recovery_model
     
     def recover_censored_demand(self, df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
-        logger.info("\n" + "="*70)
         logger.info("RECOVERING CENSORED DEMAND")
-        logger.info("="*70)
         
         df = df.copy()
         
@@ -97,8 +146,10 @@ class CensoredDemandRecovery:
         
         logger.info(f"\nStockout periods to recover: {stockout_mask.sum():,}")
         
+        # Preprocess features for prediction (using the same preprocessing as training)
+        X_stockout = self._preprocess_features(df[stockout_mask], feature_cols)
+        
         # Predict latent demand for stockout periods
-        X_stockout = df.loc[stockout_mask, feature_cols]
         recovered_demand = self.recovery_model.predict(X_stockout)
         
         # Create recovered demand column
