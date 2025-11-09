@@ -3,12 +3,6 @@ import numpy as np
 import logging
 from datetime import datetime
 from typing import List, Dict, Tuple, Any
-from sklearn.feature_selection import RFECV, mutual_info_regression
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-import lightgbm as lgb
-from sklearn.preprocessing import LabelEncoder
-
 logger = logging.getLogger(__name__)
 class FeatureEngineer:
     def __init__(self, config: Dict[str, Any]):
@@ -17,13 +11,11 @@ class FeatureEngineer:
         self.rolling_windows = config.get('feature_engineering.rolling_windows', [3, 7, 14, 28])
         self.max_features = config.get('feature_engineering.max_features', 200)
         self.selected_features = None
-        self.scaler = StandardScaler()
-        self.pca = None
         self.feature_importance_scores = None
         
     def parse_datetime(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
-        if 'date' in df.columns and not pd.api.types.is_datetime64_any_dtype(df['date']):
+        if 'date' in df.columns:
             df['date'] = pd.to_datetime(df['date'])
         return df
         
@@ -55,8 +47,7 @@ class FeatureEngineer:
                 hour = int(row.get('hour', 0))
                 return int(str(row['hours_stock_status'])[hour])
             except (ValueError, IndexError):
-                return 1
-                
+                return 1        
         df['current_hour_stock'] = df.apply(get_current_hour_stock, axis=1)
         
         #lag stockout features
@@ -64,7 +55,6 @@ class FeatureEngineer:
         df['stockout_lag_1'] = df.groupby(['store_id', 'product_id'])['is_any_stockout'].shift(1)
         df['stockout_lag_24'] = df.groupby(['store_id', 'product_id'])['is_any_stockout'].shift(24)
         df['stockout_lag_168'] = df.groupby(['store_id', 'product_id'])['is_any_stockout'].shift(168)
-        
         logger.info(f"Generated {len([c for c in df.columns if c.startswith('stockout_lag')])} stockout features")
         return df
     
@@ -72,22 +62,17 @@ class FeatureEngineer:
         """Encode categorical features using one-hot encoding."""
         df = df.copy()
         
-        # List of categorical columns to encode
         categorical_cols = [
             'temperature_category',
             'precipitation_category',
             'humidity_category',
             'wind_category'
         ]
-        
-        # Only encode columns that exist in the dataframe
         categorical_cols = [col for col in categorical_cols if col in df.columns]
         
         if categorical_cols:
-            # Perform one-hot encoding
             df = pd.get_dummies(df, columns=categorical_cols, prefix_sep='_')
             logger.info(f"Encoded {len(categorical_cols)} categorical features")
-            
         return df
         
     def generate_weather_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -156,26 +141,22 @@ class FeatureEngineer:
             df['wind_category'] = df['avg_wind_level'].apply(wind_category)
             features_added.append('wind_category')
         
-
         if features_added:
             logger.info(f"Created weather features: {', '.join(features_added)}")
-        else:
-            logger.warning("No weather features created - required columns not found in the dataset")
-        categorical_columns = ['temperature_category', 'precipitation_category', 'humidity_category', 'wind_category']
-        for col in categorical_columns:
-            if col in df.columns:
-                le = LabelEncoder()
-                df[col] = le.fit_transform(df[col])
+        
         return df
         
     def generate_promotion_features(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
         
         # Discount features
-        df['has_discount'] = (df['discount'] > 0).astype(int)
-        df['discount_level'] = pd.cut(df['discount'], 
-                                       bins=[0, 0.1, 0.2, 0.3, 1.0],
-                                       labels=['none', 'low', 'medium', 'high'])
+        if 'discount' in df.columns:
+            df['has_discount'] = (df['discount'] > 0).astype(int)
+            df['discount_level'] = pd.cut(df['discount'], 
+                                           bins=[0, 0.1, 0.2, 0.3, 1.0],
+                                           labels=['none', 'low', 'medium', 'high'])
+            df['discount_lag_24h'] = df.groupby(['store_id', 'product_id'])['discount'].shift(24)
+            df['discount_lag_168h'] = df.groupby(['store_id', 'product_id'])['discount'].shift(168)
         
         # Activity flag features
         if 'activity_flag' in df.columns:
@@ -183,65 +164,48 @@ class FeatureEngineer:
                 lambda x: x.rolling(window=168, min_periods=1).sum() 
             )
         
-        # Lagged promotion effects
-        if 'discount' in df.columns:
-            df['discount_lag_24h'] = df.groupby(['store_id', 'product_id'])['discount'].shift(24)
-            df['discount_lag_168h'] = df.groupby(['store_id', 'product_id'])['discount'].shift(168)
-        
         logger.info("Created promotion features")
         return df
     
     
     def generate_lag_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        df = df.sort_values(by=['date']).copy()
+        df = df.sort_values(['store_id', 'product_id', 'date']).copy()
         for period in self.lag_periods:
-            df[f'sale_amount_lag_{period}'] = df['sale_amount'].shift(period)
+            df[f'sale_amount_lag_{period}'] = df.groupby(['store_id', 'product_id'])['sale_amount'].shift(period)
         logger.info(f"Generated {len([c for c in df.columns if c.startswith('sale_amount_lag')])} lag features")
         return df
     
     def generate_rolling_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        df = df.sort_values(by=['date']).copy()
+        df = df.sort_values(['store_id', 'product_id', 'date']).copy()
         for window in self.rolling_windows:
-            df[f'sale_amount_rolling_{window}_mean'] = df['sale_amount'].rolling(window=window).mean()
-            df[f'sale_amount_rolling_{window}_std'] = df['sale_amount'].rolling(window=window).std()
+            df[f'sale_amount_rolling_{window}_mean'] = df.groupby(['store_id', 'product_id'])['sale_amount'].transform(
+                lambda x: x.rolling(window=window, min_periods=1).mean()
+            )
+            df[f'sale_amount_rolling_{window}_std'] = df.groupby(['store_id', 'product_id'])['sale_amount'].transform(
+                lambda x: x.rolling(window=window, min_periods=1).std()
+            )
         logger.info(f"Generated {len([c for c in df.columns if c.startswith('sale_amount_rolling')])} rolling features")
         return df
 
     def generate_hierarchical_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        if 'sale_amount' not in df.columns:
-            logger.warning("'sale_amount' column not found. Skipping hierarchical features.")
-            return df
-            
         df = df.copy()
-        date_col = 'date' if 'date' in df.columns else 'dt' if 'dt' in df.columns else None
-        if date_col is None:
-            logger.warning("Neither 'date' nor 'dt' column found. Skipping hierarchical features.")
-            return df
-        
-        # Category-level aggregations
+        date_col = 'date' if 'date' in df.columns else 'dt'
+
         for cat_level in ['first_category_id', 'second_category_id', 'third_category_id']:
             if cat_level in df.columns:
-                try:
-                    agg_df = df.groupby([cat_level, date_col])['sale_amount'].agg(['mean', 'sum']).reset_index()
-                    agg_df.columns = [cat_level, date_col, f'{cat_level}_avg_sales', f'{cat_level}_total_sales']
-                    df = df.merge(agg_df, on=[cat_level, date_col], how='left')
-                except Exception as e:
-                    logger.warning(f"Error generating {cat_level} aggregations: {str(e)}")
+                agg_df = df.groupby([cat_level, date_col])['sale_amount'].agg(['mean', 'sum']).reset_index()
+                agg_df.columns = [cat_level, date_col, f'{cat_level}_avg_sales', f'{cat_level}_total_sales']
+                df = df.merge(agg_df, on=[cat_level, date_col], how='left')
         
         # Store-level aggregations
-        try:
+        if 'store_id' in df.columns:
             store_agg = df.groupby(['store_id', date_col])['sale_amount'].agg(['mean', 'sum']).reset_index()
             store_agg.columns = ['store_id', date_col, 'store_avg_sales', 'store_total_sales']
             df = df.merge(store_agg, on=['store_id', date_col], how='left')
-        except Exception as e:
-            logger.warning(f"Error generating store-level aggregations: {str(e)}")
         
-        # Log which features were added
         agg_features = [col for col in df.columns if col.endswith(('_avg_sales', '_total_sales'))]
         if agg_features:
             logger.info(f"Created {len(agg_features)} hierarchical aggregation features")
-        else:
-            logger.warning("No hierarchical aggregation features were created")
         
         return df
     
@@ -250,13 +214,9 @@ class FeatureEngineer:
         initial_shape = df.shape
         logger.info(f"\nInput data shape: {initial_shape}")
         
-        # Make a copy of the original dataframe
         df = df.copy()
-        
-        # Store the target variable if it exists
         target_col = 'recovered_demand' if 'recovered_demand' in df.columns else None
-        if target_col:
-            y = df[target_col]
+        y = df[target_col] if target_col else None
         
         # Parse datetime and extract time-based features
         logger.info("\n[1/8] Time features...")
@@ -286,10 +246,8 @@ class FeatureEngineer:
         logger.info("[8/8] Encoding categorical features...")
         df = self.encode_categorical_features(df)
         
-        # Add back the target variable if it existed
-        if target_col is not None:
+        if target_col:
             df[target_col] = y
-        
         # Handle NaN from lag/rolling features
         initial_rows = len(df)
         df = df.dropna(subset=['sale_amount'])
@@ -297,24 +255,19 @@ class FeatureEngineer:
         logger.info(f"\nDropped {initial_rows - len(df)} rows with NaN")
         logger.info(f"Generated {df.shape[1] - initial_shape[1]} new features")
     
-        # Define columns to exclude from features
         exclude_cols = [
+            'sale_amount',
             'hours_sale', 'store_id', 'product_id',
             'city_id', 'management_group_id', 'first_category_id', 
             'second_category_id', 'third_category_id', 'hours_stock_status'
         ]
-        
-        # Only keep numeric columns for modeling
         numeric_cols = df.select_dtypes(include=['int64', 'float64', 'uint8', 'bool']).columns.tolist()
-        
-        # Get final feature names (numeric columns that are not in exclude_cols)
         self.feature_names = [col for col in numeric_cols if col not in exclude_cols]
         
-        # Add back target column if it exists
-        if target_col in df.columns and target_col not in self.feature_names:
+        # Ensure target_col is in feature_names if it exists (for recovered_demand)
+        if target_col and target_col not in self.feature_names:
             self.feature_names.append(target_col)
-    
         logger.info(f"\nTotal features available: {len(self.feature_names)}")
-        logger.info(f"Final data shape: {df[self.feature_names].shape}")
-    
-        return df[self.feature_names], [f for f in self.feature_names if f != target_col]
+        logger.info(f"Final data shape: {df.shape}")
+        logger.info(f"Features for modeling: {len([f for f in self.feature_names if f != target_col])}")
+        return df, [f for f in self.feature_names if f != target_col]

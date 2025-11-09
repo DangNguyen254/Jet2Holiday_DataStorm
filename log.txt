@@ -1,0 +1,105 @@
+INFO:forecasting_model:Best MAPE: 121.5290
+INFO:forecasting_model:Best parameters:
+INFO:forecasting_model:n_estimators: 203
+INFO:forecasting_model:learning_rate: 0.01992648863940167
+INFO:forecasting_model:max_depth: 4
+INFO:forecasting_model:num_leaves: 32
+INFO:forecasting_model:min_child_samples: 72
+INFO:forecasting_model:subsample: 0.6961729842404845
+INFO:forecasting_model:colsample_bytree: 0.6280022966739788
+INFO:forecasting_model:reg_alpha: 3.0226816030428617e-07
+INFO:forecasting_model:reg_lambda: 4.738935784419066
+INFO:forecasting_model:TRAINING FINAL FORECASTING MODEL
+Training until validation scores don't improve for 50 rounds
+Early stopping, best iteration is:
+[7]     valid_0's rmse: 1.50511
+INFO:forecasting_model:
+ Model training complete!
+INFO:forecasting_model:
+ Top 10 Most Important Features:
+                        feature  importance
+1                        precpt          26
+2               avg_temperature          20
+3                  avg_humidity          12
+4                avg_wind_level          12
+29  first_category_id_avg_sales           6
+5                    is_weekend           5
+20           sale_amount_lag_28           5
+18            sale_amount_lag_7           4
+35              store_avg_sales           4
+36            store_total_sales           3
+INFO:forecasting_model:
+Target value statistics:
+INFO:forecasting_model:  Min: 0.000000, Max: 49.900000
+INFO:forecasting_model:  Mean: 1.193053, Median: 0.800000
+INFO:forecasting_model:  Zero count: 14563, Small values (<0.001): 14563
+INFO:forecasting_model:  Prediction range: [1.001326, 1.056984]
+INFO:forecasting_model:
+======================================================================
+INFO:forecasting_model:MODEL EVALUATION
+INFO:forecasting_model:======================================================================
+INFO:forecasting_model:  MAPE: 108.21%
+INFO:forecasting_model:  RMSE: 1.9202
+INFO:forecasting_model:  MAE: 0.8099
+INFO:forecasting_model:  BIAS: -0.1857
+INFO:forecasting_model:  BIAS_PCT: -15.5624
+INFO:forecasting_model:  R2: -0.0091
+INFO:__main__:
+RESULTS COMPARISON
+INFO:__main__:
+Two-Stage Pipeline (with demand recovery):
+INFO:__main__:  MAPE: 66.97%
+INFO:__main__:  RMSE: 0.4249
+INFO:__main__:  MAE: 0.1757
+INFO:__main__:  BIAS: 0.0776
+INFO:__main__:  BIAS_PCT: 6.2104
+INFO:__main__:
+Baseline (without demand recovery):
+INFO:__main__:  MAPE: 108.21%
+INFO:__main__:  RMSE: 1.9202
+INFO:__main__:  MAE: 0.8099
+INFO:__main__:  BIAS: -0.1857
+INFO:__main__:  BIAS_PCT: -15.5624
+INFO:__main__:  R2: -0.0091
+INFO:__main__:
+KEY IMPROVEMENTS
+Baseline (without demand recovery):
+INFO:__main__:  MAPE: 108.21%
+INFO:__main__:  RMSE: 1.9202
+INFO:__main__:  MAE: 0.8099
+INFO:__main__:  BIAS: -0.1857
+INFO:__main__:  BIAS_PCT: -15.5624
+INFO:__main__:  R2: -0.0091
+INFO:__main__:
+KEY IMPROVEMENTS
+INFO:__main__:  MAPE: 108.21%
+INFO:__main__:  RMSE: 1.9202
+INFO:__main__:  MAE: 0.8099
+INFO:__main__:  BIAS: -0.1857
+INFO:__main__:  BIAS_PCT: -15.5624
+INFO:__main__:  R2: -0.0091
+INFO:__main__:
+KEY IMPROVEMENTS
+INFO:__main__:  MAPE Improvement: 38.11%
+INFO:__main__:  Bias Reduction: 9.35 percentage points
+INFO:__main__:  MAE: 0.8099
+INFO:__main__:  BIAS: -0.1857
+INFO:__main__:  BIAS_PCT: -15.5624
+INFO:__main__:  R2: -0.0091
+INFO:__main__:
+KEY IMPROVEMENTS
+INFO:__main__:  MAPE Improvement: 38.11%
+INFO:__main__:  Bias Reduction: 9.35 percentage points
+INFO:__main__:  BIAS: -0.1857
+INFO:__main__:  BIAS_PCT: -15.5624
+INFO:__main__:  R2: -0.0091
+INFO:__main__:
+KEY IMPROVEMENTS
+INFO:__main__:  MAPE Improvement: 38.11%
+INFO:__main__:  Bias Reduction: 9.35 percentage points
+INFO:__main__:  R2: -0.0091
+INFO:__main__:
+KEY IMPROVEMENTS
+INFO:__main__:  MAPE Improvement: 38.11%
+INFO:__main__:  Bias Reduction: 9.35 percentage points
+INFO:__main__:
