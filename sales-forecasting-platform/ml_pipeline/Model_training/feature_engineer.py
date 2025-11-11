@@ -19,6 +19,26 @@ class FeatureEngineer:
             df['date'] = pd.to_datetime(df['date'])
         return df
         
+    def handle_outliers(self, df: pd.DataFrame) -> pd.DataFrame:
+        Q1 = df['sale_amount'].quantile(0.25)
+        Q3 = df['sale_amount'].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        is_outlier = (df['sale_amount'] < lower_bound) | (df['sale_amount'] > upper_bound)
+        num_outliers = is_outlier.sum()
+        
+        if num_outliers > 0:
+            logger.info(f"Found {num_outliers} outliers in sale_amount ({num_outliers/len(df)*100:.2f}% of data)")
+            logger.info(f"Capping values to range: [{lower_bound:.2f}, {upper_bound:.2f}]")
+            df['sale_amount'] = np.where(
+                df['sale_amount'] < lower_bound, lower_bound,
+                np.where(df['sale_amount'] > upper_bound, upper_bound, df['sale_amount'])
+            )
+        else:
+            logger.info("No outliers detected in sale_amount")
+        return df
+        
     def generate_time_features(self, df: pd.DataFrame) -> pd.DataFrame:
         df = self.parse_datetime(df.copy())  
         df['year'] = df['date'].dt.year
@@ -49,8 +69,6 @@ class FeatureEngineer:
             except (ValueError, IndexError):
                 return 1        
         df['current_hour_stock'] = df.apply(get_current_hour_stock, axis=1)
-        
-        #lag stockout features
         df = df.sort_values(['store_id', 'product_id', 'date'])
         df['stockout_lag_1'] = df.groupby(['store_id', 'product_id'])['is_any_stockout'].shift(1)
         df['stockout_lag_24'] = df.groupby(['store_id', 'product_id'])['is_any_stockout'].shift(24)
@@ -59,7 +77,6 @@ class FeatureEngineer:
         return df
     
     def encode_categorical_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Encode categorical features using one-hot encoding."""
         df = df.copy()
         
         categorical_cols = [
@@ -69,7 +86,6 @@ class FeatureEngineer:
             'wind_category'
         ]
         categorical_cols = [col for col in categorical_cols if col in df.columns]
-        
         if categorical_cols:
             df = pd.get_dummies(df, columns=categorical_cols, prefix_sep='_')
             logger.info(f"Encoded {len(categorical_cols)} categorical features")
@@ -222,7 +238,8 @@ class FeatureEngineer:
         logger.info("\n[1/8] Time features...")
         df = self.parse_datetime(df)
         df = self.generate_time_features(df)
-        
+        logger.info("Handle Outliers...")
+        df = self.handle_outliers(df)
         # Generate other features
         logger.info("[2/8] Stockout features...")
         df = self.generate_stock_out_features(df)

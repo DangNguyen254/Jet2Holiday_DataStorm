@@ -65,9 +65,6 @@ def run_complete_pipeline():
             for col in feature_names:
                 if col not in eval_features.columns:
                     eval_features[col] = 0
-            
-            # CRITICAL: Preserve sale_amount even though it's not in feature_names
-            # It's needed for the recovery model
             columns_to_keep = list(feature_names)
             if 'sale_amount' in eval_features.columns and 'sale_amount' not in columns_to_keep:
                 columns_to_keep.append('sale_amount')
@@ -121,16 +118,11 @@ def run_complete_pipeline():
         X_eval = eval_features[feature_names].copy()
         y_eval = eval_features['recovered_demand'].copy()
         
-        # Ensure data is sorted by date for time-aware split
-        # Note: Feature engineering should have sorted by store_id, product_id, date
-        # But we need to ensure global date ordering for the split
         if 'date' in train_features.columns:
             date_sort_idx = train_features['date'].argsort()
             X_train = X_train.iloc[date_sort_idx].reset_index(drop=True)
             y_train = y_train.iloc[date_sort_idx].reset_index(drop=True)
         
-        # Time-aware split: use first 80% chronologically
-        # This prevents future data from leaking into training
         split_idx = int(len(X_train) * 0.8)
         X_train_split = X_train.iloc[:split_idx].copy()
         y_train_split = y_train.iloc[:split_idx].copy()

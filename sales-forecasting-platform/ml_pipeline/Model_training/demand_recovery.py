@@ -78,12 +78,10 @@ class CensoredDemandRecovery:
                     df[col] = 0
             available_cols = [col for col in self.training_feature_columns if col in df.columns]
             df = df[available_cols]
-        
         return df
         
     def train_recovery_model(self, df: pd.DataFrame, feature_cols: list) -> lgb.LGBMRegressor:
         logger.info("STAGE 1: TRAINING DEMAND RECOVERY MODEL")
-        
         clean_data = df[df['is_any_stockout'] == 0].copy()
         logger.info(f"\nClean data (no stockouts): {len(clean_data):,} rows")
         logger.info(f"Stockout data: {len(df[df['is_any_stockout'] == 1]):,} rows")
@@ -132,7 +130,6 @@ class CensoredDemandRecovery:
             mape = float('inf')
         
         rmse = np.sqrt(mean_squared_error(y_val, y_pred))
-        
         logger.info(f"\nRecovery Model Performance (on clean data):")
         logger.info(f"  MAPE: {mape:.2f}%")
         logger.info(f"  RMSE: {rmse:.4f}")
@@ -151,7 +148,7 @@ class CensoredDemandRecovery:
         logger.info("RECOVERING CENSORED DEMAND")
         df = df.copy()
         
-        # CRITICAL: Ensure sale_amount exists in dataframe (needed for recovery)
+        # Ensure sale_amount exists in dataframe which is needed for recovery
         if 'sale_amount' not in df.columns:
             raise ValueError("'sale_amount' column is required but not found in dataframe. "
                            "It should be preserved during feature engineering.")

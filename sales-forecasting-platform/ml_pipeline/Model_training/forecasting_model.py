@@ -61,8 +61,6 @@ class ForecastingModel:
                 )
                 
                 y_pred = model.predict(X_val_split)
-                
-                # Robust MAPE calculation for hyperparameter optimization
                 mask = (y_val_split > 1e-6)
                 if mask.sum() > 0:
                     mape = np.mean(np.abs((y_val_split[mask] - y_pred[mask]) / y_val_split[mask])) * 100
@@ -150,7 +148,7 @@ class ForecastingModel:
         }
         
         logger.info("\n" + "="*70)
-        logger.info("MODEL EVALUATION")
+        logger.info("Forecast MODEL EVALUATION")
         logger.info("="*70)
         for metric, value in metrics.items():
             if metric == 'mape':
