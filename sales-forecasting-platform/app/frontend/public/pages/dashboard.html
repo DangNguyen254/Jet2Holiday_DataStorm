@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard Quản lý Nhu cầu & Tồn kho</title>
+
+    <!-- Bootstrap 5, Font Awesome, Chart.js via CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+    <link href="../assets/css/styles.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    
+</head>
+
+<body>
+    <!-- Top Navigation / Title -->
+    <nav class="navbar app-nav sticky-top">
+        <div class="container-fluid px-3 px-md-4">
+            <div class="d-flex align-items-center gap-2">
+                <span class="bg-primary-subtle text-primary p-2 rounded-3"><i class="fa-solid fa-chart-line"></i></span>
+                <span class="fw-semibold">Dashboard</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="forecast.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-magnifying-glass-chart"></i> Forecast</a>
+                <a href="alert.html" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-bell"></i> Cảnh báo</a>
+                <a href="inventory.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-box"></i> Tồn kho</a>
+                <a href="report.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-chart-pie"></i> Báo cáo</a>
+                <a href="upload.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-cloud-arrow-up"></i> Tải dữ liệu</a>
+                <button id="btnDark" class="btn btn-sm btn-outline-secondary" aria-label="Đổi giao diện sáng/tối"><i class="fa-solid fa-moon"></i></button>
+                <a class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#tableauModal"><i class="fa-solid fa-table"></i> Tableau</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-fluid px-3 px-md-4 py-4">
+        <!-- Filters -->
+        <section class="card card-soft p-3 p-md-4 mb-4" aria-label="Bộ lọc">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-3">
+                    <label class="form-label">Dự đoán</label>
+                    <select id="fTimeMode" class="form-select">
+                        <option value="hour" selected>Theo giờ</option>
+                        <option value="day">Theo ngày</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label" id="timeLabel">Chọn ngày dự đoán</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="date" id="pickHourDate" class="form-control" aria-label="Chọn ngày cho chế độ theo giờ">
+                        <input type="date" id="pickDayStart" class="form-control" style="display:none;" aria-label="Chọn ngày bắt đầu (7N)">
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label">Khu vực</label>
+                    <select id="fRegion" class="form-select">
+                        <option value="all" selected>Tất cả</option>
+                        <option>Hà Nội</option>
+                        <option>Đà Nẵng</option>
+                        <option>Hồ Chí Minh</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label">Cửa hàng</label>
+                    <select id="fStore" class="form-select">
+                        <option value="all" selected>Tất cả</option>
+                        <option>HCM-01</option>
+                        <option>HN-02</option>
+                        <option>DN-03</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label">Danh mục</label>
+                    <select id="fCategory" class="form-select">
+                        <option value="all" selected>Tất cả</option>
+                        <option>Thực phẩm</option>
+                        <option>Đồ uống</option>
+                        <option>Gia dụng</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label">Sản phẩm</label>
+                    <select id="fProduct" class="form-select">
+                        <option value="all" selected>Tất cả</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- KPI cards -->
+        <section class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card card-soft p-3 h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="kpi-icon bg-primary-subtle text-primary"><i class="fa-solid fa-bullseye"></i></span>
+                        <div class="flex-grow-1">
+                            <div class="kpi-title">Doanh số thực tế</div>
+                            <div class="kpi-value" id="kpiHit">—</div>
+                            <div class="small kpi-delta up" id="kpiHitDelta">So với kỳ trước: —</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card card-soft p-3 h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="kpi-icon bg-info-subtle text-info"><i class="fa-solid fa-square-root-variable"></i></span>
+                        <div class="flex-grow-1">
+                            <div class="kpi-title">MAPE</div>
+                            <div class="kpi-value" id="kpiMape">—</div>
+                            <div class="small kpi-delta down" id="kpiMapeDelta">So với kỳ trước: —</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card card-soft p-3 h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="kpi-icon bg-warning-subtle text-warning"><i class="fa-solid fa-box-open"></i></span>
+                        <div class="flex-grow-1">
+                            <div class="kpi-title">% Stock-out</div>
+                            <div class="kpi-value" id="kpiOOS">—</div>
+                            <div class="small text-muted">Tỷ lệ sản phẩm hết hàng</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card card-soft p-3 h-100">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="kpi-icon bg-success-subtle text-success"><i class="fa-solid fa-recycle"></i></span>
+                        <div class="flex-grow-1">
+                            <div class="kpi-title">% Waste</div>
+                            <div class="kpi-value" id="kpiWaste">—</div>
+                            <div class="small text-muted">Phần chênh dự báo > thực tế</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts and Alerts -->
+        <section class="row g-3">
+                    <div class="col-12 col-xl-8">
+                <div class="card card-soft p-3">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h6 class="m-0">Nhu cầu theo thời gian</h6>
+                    </div>
+                            <div class="chart-wrap tall"><canvas id="lineDemand"></canvas></div>
+                </div>
+            </div>
+                    <div class="col-12 col-xl-4">
+                        <div class="card card-soft p-3 h-100">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="m-0">Top sản phẩm bán chạy / dễ hết hàng</h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <small id="barPageInfo" class="text-muted"></small>
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Phân trang top sản phẩm">
+                                        <button id="btnBarPrev" class="btn btn-outline-secondary" title="Trang trước" aria-label="Trang trước">‹</button>
+                                        <button id="btnBarNext" class="btn btn-outline-secondary" title="Trang sau" aria-label="Trang sau">›</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chart-wrap"><canvas id="barTopProducts"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="card card-soft p-3">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="m-0">Cảnh báo nhanh</h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <small id="alertsPageInfo" class="text-muted"></small>
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Phân trang cảnh báo">
+                                        <button id="btnAlertsPrev" class="btn btn-outline-secondary" title="Trang trước" aria-label="Trang trước">‹</button>
+                                        <button id="btnAlertsNext" class="btn btn-outline-secondary" title="Trang sau" aria-label="Trang sau">›</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="list-group list-alerts" id="alerts"></div>
+                        </div>
+                    </div>
+        </section>
+
+        <div class="text-end small text-muted mt-4">
+            <a class="footer-link" data-bs-toggle="modal" data-bs-target="#tableauModal">Xem bảng điều khiển Tableau</a>
+        </div>
+    </main>
+
+    <!-- Tableau Modal -->
+    <div class="modal fade" id="tableauModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content card-soft">
+                <div class="modal-header">
+                    <h6 class="modal-title">Embedded Tableau</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0" style="height:70vh;">
+                    <iframe title="Tableau" width="100%" height="100%" style="border:0" 
+                        src="https://public.tableau.com/app/profile/israel.ayo/viz/SuperstoreSalesDashboard_17403964185480/KPIsSummary">
+                    </iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../vendor/mock-data.js"></script>
+    <script>
+        // -----------------------
+        // Mock data (small, easy to tweak)
+        // -----------------------
+        const products = MockData.getProducts();
+
+        // each record = one hour/day observation
+        const now = new Date();
+        function daysAgo(n){ const d=new Date(now); d.setDate(d.getDate()-n); return d; }
+
+        // Use shared dataset from localStorage so all pages align
+        const shared = MockData.getDataset();
+        // Convert shared daily records into raw structure (strip future beyond 10 days for dashboard brevity)
+        const raw = shared.slice(0, 10 * products.length).map(r => ({
+            date: new Date(r.date.getFullYear(), r.date.getMonth(), r.date.getDate()),
+            region: r.region, store: r.store, category: r.category,
+            sku: r.sku, product: r.product,
+            forecast: r.forecast, actual: r.actual,
+            stockRemaining: r.stockRemaining
+        }));
+
+        // Weather signal (demo)
+        const weatherImpact = { active: true, delta: -0.15, text: 'Mưa lớn → giảm nhu cầu 15%' };
+
+        // -----------------------
+        // Helpers
+        // -----------------------
+        function fmtPct(x){ return (x*100).toFixed(1) + '%'; }
+        function pct(n, d){ return d===0? 0 : (n/d); }
+        function sum(arr, sel){ return arr.reduce((t,x)=>t + (sel? sel(x) : x), 0); }
+        function groupBy(arr, keyFn){ return arr.reduce((m,x)=>{ const k=keyFn(x); (m[k]||(m[k]=[])).push(x); return m; }, {}); }
+        function unique(arr){ return [...new Set(arr)]; }
+
+        // -----------------------
+        // Filtering
+        // -----------------------
+        const fRegion = document.getElementById('fRegion');
+        const fStore = document.getElementById('fStore');
+        const fCategory = document.getElementById('fCategory');
+        const fProduct = document.getElementById('fProduct');
+        // Map display region names to dataset codes
+        const regionMap = { 'Hà Nội':'North', 'Đà Nẵng':'Central', 'Hồ Chí Minh':'South' };
+
+        function populateStores(){
+            const uiRegion = fRegion.value;
+            const code = regionMap[uiRegion] || uiRegion;
+            const stores = unique(raw
+                .filter(r => uiRegion==='all' ? true : r.region===code)
+                .map(r => r.store))
+                .sort();
+            fStore.innerHTML = '<option value="all" selected>Tất cả</option>' +
+                stores.map(s => `<option>${s}</option>`).join('');
+        }
+
+        function populateProducts(){
+            const cat = fCategory.value;
+            const names = unique(raw
+                .filter(r => cat==='all' ? true : r.category===cat)
+                .map(r => r.product));
+            fProduct.innerHTML = '<option value="all" selected>Tất cả</option>' +
+                names.sort().map(n => `<option>${n}</option>`).join('');
+        }
+
+        const fTimeMode = document.getElementById('fTimeMode');
+
+        function applyFilters(){
+            const uiRegion = fRegion.value;
+            const regionCode = regionMap[uiRegion] || uiRegion;
+            let inRange;
+            if (fTimeMode.value==='day'){
+                const startIso = pickDayStart.value;
+                const startDate = new Date(startIso+'T00:00:00');
+                const endDate = new Date(startDate); endDate.setDate(endDate.getDate()+6);
+                inRange = (d)=> d >= new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()) && d <= new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+            } else {
+                const dayIso = pickHourDate.value;
+                inRange = (d)=> d.toISOString().slice(0,10) === dayIso;
+            }
+            return raw.filter(r =>
+                inRange(r.date) &&
+                (uiRegion==='all'|| r.region===regionCode) &&
+                (fStore.value==='all'|| r.store===fStore.value) &&
+                (fCategory.value==='all'|| r.category===fCategory.value) &&
+                (fProduct.value==='all' || r.product===fProduct.value)
+            );
+        }
+
+        // -----------------------
+        // KPIs + Alerts
+        // -----------------------
+        const elHit = document.getElementById('kpiHit');
+        const elHitDelta = document.getElementById('kpiHitDelta');
+        const elMape = document.getElementById('kpiMape');
+        const elMapeDelta = document.getElementById('kpiMapeDelta');
+        const elOOS = document.getElementById('kpiOOS');
+        const elWaste = document.getElementById('kpiWaste');
+        const elAlerts = document.getElementById('alerts');
+
+        function calcKPIs(data){
+            // Overall sums
+            const fSum = sum(data, r=>r.forecast);
+            const aSum = sum(data, r=>r.actual);
+            const hit = pct(aSum, fSum);
+
+            // naive MAPE
+            const mape = data.length===0? 0 : sum(data, r => Math.abs(r.actual - r.forecast)/Math.max(1,r.forecast)) / data.length;
+            const waste = pct(sum(data, r => Math.max(0, r.forecast - r.actual)), fSum);
+
+            // stock-out: sku/day with remaining==0
+            const groups = groupBy(data, r=> r.sku+ '|' + r.date.toISOString().slice(0,10));
+            const skuDays = Object.values(groups);
+            const oosCount = skuDays.filter(g => g.some(r => r.stockRemaining<=0)).length;
+            const oos = pct(oosCount, Math.max(1, skuDays.length));
+
+            return { hit, mape, waste, oos };
+        }
+
+        function renderKPIs(k){
+            elHit.textContent = fmtPct(k.hit);
+            elMape.textContent = fmtPct(k.mape);
+            elOOS.textContent = fmtPct(k.oos);
+            elWaste.textContent = fmtPct(k.waste);
+            // mock deltas with contextual labels by time mode
+            const isDayMode = (document.getElementById('fTimeMode').value === 'day');
+            const deltaLabel = isDayMode ? 'So với khoảng 7 ngày trước' : 'So với ngày trước';
+            elHitDelta.textContent = `${deltaLabel}: +${(Math.random()*2).toFixed(1)}%`;
+            elMapeDelta.textContent = `${deltaLabel}: -${(Math.random()*1).toFixed(1)}%`;
+        }
+
+        function renderAlerts(data){
+            elAlerts.innerHTML = '';
+            // Build alert objects
+            const low = data.filter(r => r.stockRemaining>0 && r.stockRemaining <= 12);
+            const bySku = groupBy(low, r=>r.sku);
+            const alerts = Object.entries(bySku).map(([sku, items])=>{
+                const name = items[0].product;
+                const soon = 4 + Math.floor(Math.random()*3);
+                return { kind: 'stock', sku, title: `SKU ${sku} sắp hết hàng`, desc: `${name} tồn kho thấp, dự kiến hết trong ${soon} giờ tới` };
+            });
+            if (weatherImpact.active){ alerts.push({ kind: 'weather', title: 'Dự báo thời tiết', desc: weatherImpact.text }); }
+            const totalPagesRaw = Math.ceil(alerts.length / ALERTS_PAGE_SIZE);
+            const totalPages = Math.max(3, totalPagesRaw);
+            if (alertsPage > totalPages) alertsPage = totalPages;
+            const start = (alertsPage - 1) * ALERTS_PAGE_SIZE;
+            const slice = alerts.slice(start, start + ALERTS_PAGE_SIZE);
+            while (slice.length < ALERTS_PAGE_SIZE) { slice.push({ kind: 'blank', title: '—', desc: ' ' }); }
+            const infoEl = document.getElementById('alertsPageInfo');
+            if (infoEl) infoEl.textContent = `Trang ${alertsPage}/${totalPages}`;
+            const prevBtn = document.getElementById('btnAlertsPrev');
+            const nextBtn = document.getElementById('btnAlertsNext');
+            if (prevBtn) prevBtn.disabled = alertsPage <= 1;
+            if (nextBtn) nextBtn.disabled = alertsPage >= totalPages;
+            slice.forEach(a => {
+                if (a.kind==='stock'){
+                    elAlerts.insertAdjacentHTML('beforeend', `
+                        <div class="list-group-item d-flex align-items-start justify-content-between">
+                            <div>
+                                <div class="fw-semibold"><i class="fa-solid fa-triangle-exclamation text-warning me-2"></i>${a.title}</div>
+                                <div class="small text-muted">${a.desc}</div>
+                            </div>
+                            <span class="badge text-bg-warning">Stock</span>
+                        </div>`);
+                } else if (a.kind==='weather') {
+                    elAlerts.insertAdjacentHTML('beforeend', `
+                        <div class="list-group-item d-flex align-items-start justify-content-between">
+                            <div>
+                                <div class="fw-semibold"><i class="fa-solid fa-cloud-rain text-info me-2"></i>${a.title}</div>
+                                <div class="small text-muted">${a.desc}</div>
+                            </div>
+                            <span class="badge text-bg-info">Weather</span>
+                        </div>`);
+                } else if (a.kind==='blank') {
+                    elAlerts.insertAdjacentHTML('beforeend', `
+                        <div class="list-group-item d-flex align-items-start justify-content-between opacity-50">
+                            <div>
+                                <div class="fw-semibold">${a.title}</div>
+                                <div class="small text-muted">${a.desc}</div>
+                            </div>
+                        </div>`);
+                }
+            });
+        }
+
+        // -----------------------
+        // Charts
+        // -----------------------
+    const ctxLine = document.getElementById('lineDemand');
+    const ctxBar = document.getElementById('barTopProducts');
+    let chartLine, chartBar;
+    // Pagination states
+    let barPage = 1; // 1-based index
+    const BAR_PAGE_SIZE = 6;
+    let alertsPage = 1; // 1-based index
+    const ALERTS_PAGE_SIZE = 4;
+
+    const pickHourDate = document.getElementById('pickHourDate');
+    const pickDayStart = document.getElementById('pickDayStart');
+
+        function initDatePickers(){
+            const today = new Date();
+            const isoToday = today.toISOString().slice(0,10);
+            // Hour mode: cho phép dự đoán mọi ngày (quá khứ & tương lai) -> không giới hạn max
+            pickHourDate.value = isoToday;
+            // Day mode: mặc định 7 ngày gần nhất, nhưng cho phép chọn start ở quá khứ hoặc tương lai
+            const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()-6);
+            pickDayStart.value = start.toISOString().slice(0,10);
+        }
+
+        function buildLineSeries(data, by='hour'){
+                if (by==='hour') {
+                    // Hour mode: user picks a date (<= today). If picked date == today -> only forecast shown.
+                    const chosen = pickHourDate.value;
+                    const today = new Date();
+                    const todayIso = today.toISOString().slice(0,10);
+                    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const chosenDate = new Date(chosen+'T00:00:00');
+                    const hours = Array.from({length:12}, (_,i)=> i*2); // 0..22 step 2
+                    const labels = hours.map(h=> String(h).padStart(2,'0')+':00');
+                    // Filter raw to that day
+                    const dayItems = data.filter(r => r.date.toISOString().slice(0,10) === chosen);
+                    let fDay = sum(dayItems, r=> r.forecast);
+                    let aDay = sum(dayItems, r=> r.actual);
+                    // nếu không có dữ liệu cho ngày được chọn, dùng baseline nhỏ để dự báo
+                    if (!fDay) { fDay = 100; }
+                    const weights = Array.from({length:12}, ()=> 0.7 + Math.random()*0.6);
+                    const wSum = weights.reduce((a,b)=>a+b,0) || 1;
+                    const forecast = weights.map(w=> fDay * (w/wSum));
+                    let actual;
+                    if (chosenDate >= todayStart) {
+                        // Hôm nay và tương lai: chưa có thực tế => hiển thị null để ẩn
+                        actual = new Array(12).fill(null);
+                    } else {
+                        actual = weights.map(w=> aDay * (w/wSum));
+                    }
+                    return { labels, actual, forecast };
+                } else {
+                    const fmtKey = (d)=> d.getDate().toString().padStart(2,'0') + '/' + (d.getMonth()+1).toString().padStart(2,'0');
+                    // Day mode: từ ngày bắt đầu trong 7 ngày (start..start+6)
+                    const startIso = pickDayStart.value;
+                    const startDate = new Date(startIso+'T00:00:00');
+                    const days = [];
+                    for (let i=0;i<7;i++){ const d=new Date(startDate); d.setDate(d.getDate()+i); days.push(d); }
+                    const todayIso = new Date().toISOString().slice(0,10);
+                    const labels = days.map(fmtKey);
+                    const actual = []; const forecast = [];
+                    // base forecast from gần nhất trong quá khứ (ưu tiên hôm qua), nếu không có lấy trung bình 7 ngày gần nhất
+                    const y = new Date(); y.setDate(y.getDate()-1);
+                    const yIso = y.toISOString().slice(0,10);
+                    const yItems = data.filter(r => r.date.toISOString().slice(0,10)===yIso);
+                    let prevF = sum(yItems, r=> r.forecast);
+                    if (!prevF) {
+                        const past = {};
+                        for (let i=1;i<=7;i++){ const d=new Date(); d.setDate(d.getDate()-i); const k=d.toISOString().slice(0,10); past[k]=sum(data.filter(r=>r.date.toISOString().slice(0,10)===k), r=>r.forecast); }
+                        const vals = Object.values(past).filter(x=>x>0);
+                        prevF = vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : 100; // fallback nhỏ
+                    }
+                    days.forEach(d => {
+                        const keyIso = d.toISOString().slice(0,10);
+                        const items = data.filter(r => r.date.toISOString().slice(0,10) === keyIso);
+                        let fVal = sum(items, r=> r.forecast);
+                        if (!fVal) { fVal = prevF * (0.98 + Math.random()*0.04); }
+                        forecast.push(fVal);
+                        prevF = fVal;
+                        // Thực tế chỉ có cho ngày quá khứ (< hôm nay)
+                        if (keyIso >= todayIso) { actual.push(null); }
+                        else { actual.push(sum(items, r=> r.actual)); }
+                    });
+                    return { labels, actual, forecast };
+                }
+        }
+
+        function buildBarSeries(data){
+            const g = groupBy(data, r=> r.product);
+            const pairs = Object.entries(g).map(([name,items])=>({ name, qty: sum(items, r=>r.actual), stock: sum(items, r=>r.stockRemaining) }));
+            pairs.sort((a,b)=> b.qty - a.qty);
+            const totalPagesRaw = Math.ceil(pairs.length / BAR_PAGE_SIZE);
+            const totalPages = Math.max(3, totalPagesRaw);
+            if (barPage > totalPages) barPage = totalPages;
+            const start = (barPage - 1) * BAR_PAGE_SIZE;
+            const slice = pairs.slice(start, start + BAR_PAGE_SIZE);
+            while (slice.length < BAR_PAGE_SIZE) { slice.push({ name: '—', qty: 0, stock: 0 }); }
+            const infoEl = document.getElementById('barPageInfo');
+            if (infoEl) infoEl.textContent = `Trang ${barPage}/${totalPages}`;
+            const prevBtn = document.getElementById('btnBarPrev');
+            const nextBtn = document.getElementById('btnBarNext');
+            if (prevBtn) prevBtn.disabled = barPage <= 1;
+            if (nextBtn) nextBtn.disabled = barPage >= totalPages;
+            return {
+                labels: slice.map(x=>x.name),
+                qty: slice.map(x=>x.qty),
+                stock: slice.map(x=>x.stock)
+            };
+        }
+
+        function renderCharts(data){
+            const by = fTimeMode.value==='day' ? 'day' : 'hour';
+            const line = buildLineSeries(data, by);
+            const bar = buildBarSeries(data);
+
+            const commonTicks = { color: getComputedStyle(document.body).getPropertyValue('--muted') };
+                const gridColor = getComputedStyle(document.body).getPropertyValue('--border');
+                const fontColor = getComputedStyle(document.body).getPropertyValue('--fg');
+
+            // Line chart
+            if (chartLine) chartLine.destroy();
+            chartLine = new Chart(ctxLine, {
+                type: 'line',
+                data: {
+                    labels: line.labels,
+                    datasets: [
+                            { label: 'Dự báo', data: line.forecast, borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.18)', borderDash: [6,6], tension: .3, pointRadius: 3, pointHoverRadius: 6 },
+                            { label: 'Thực tế', data: line.actual, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.16)', tension: .3, pointRadius: 3, pointHoverRadius: 6 }
+                    ]
+                },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                                        scales: { 
+                                            x: { 
+                                                ticks: { 
+                                                    ...commonTicks,
+                                                    autoSkip: true,
+                                                    maxRotation: 0,
+                                                    font: { size: 11 },
+                                                    callback: function(value, index, ticks){
+                                                        const v = this.getLabelForValue(value);
+                                                        // đảm bảo chỉ hiển thị hh:mm nếu lỡ có label dài
+                                                        const m = /([0-9]{2}:[0-9]{2})$/.exec(v);
+                                                        return m ? m[1] : v;
+                                                    }
+                                                },
+                                                grid: { display: true, color: gridColor }
+                                            }, 
+                            y: { ticks: { ...commonTicks, font: { size: 11 } }, beginAtZero: true, grid: { color: gridColor } } 
+                            },
+                        plugins: { 
+                            legend: { labels: { color: fontColor, font: { weight: '500' } } },
+                            tooltip: { backgroundColor: 'rgba(17,24,39,.85)', titleColor: '#fff', bodyColor: '#fff', borderColor: gridColor, borderWidth: 1 }
+                        }
+                }
+            });
+
+            // Bar chart
+            if (chartBar) chartBar.destroy();
+            chartBar = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: bar.labels,
+                    datasets: [
+                                { label: 'Bán ra', data: bar.qty, backgroundColor: 'rgba(99,102,241,.75)', borderRadius: 6 },
+                                { label: 'Tồn kho', data: bar.stock, backgroundColor: 'rgba(234,179,8,.75)', borderRadius: 6 }
+                    ]
+                },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: { 
+                                x: { ticks: { ...commonTicks, autoSkip: false, font: { size: 11 } }, grid: { display: false } }, 
+                                y: { ticks: { ...commonTicks, font: { size: 11 } }, beginAtZero: true, grid: { color: gridColor } } 
+                            },
+                            plugins: { legend: { labels: { color: fontColor, font: { weight: '500' } } }, tooltip: { backgroundColor: 'rgba(17,24,39,.85)', titleColor: '#fff', bodyColor: '#fff', borderColor: gridColor, borderWidth: 1 } }
+                }
+            });
+        }
+
+        // -----------------------
+        // Orchestration
+        // -----------------------
+        function refresh(){
+            const filtered = applyFilters();
+            const kpis = calcKPIs(filtered);
+            renderKPIs(kpis);
+            renderCharts(filtered);
+            renderAlerts(filtered);
+        }
+
+    // events
+    fRegion.addEventListener('change', ()=>{ populateStores(); fStore.value='all'; barPage=1; alertsPage=1; refresh(); });
+    fStore.addEventListener('change', ()=>{ barPage=1; alertsPage=1; refresh(); });
+    fCategory.addEventListener('change', ()=>{ populateProducts(); fProduct.value='all'; barPage=1; alertsPage=1; refresh(); });
+    fProduct.addEventListener('change', ()=>{ barPage=1; alertsPage=1; refresh(); });
+        const timeLabel = document.getElementById('timeLabel');
+        fTimeMode.addEventListener('change', ()=>{
+            const isDay = fTimeMode.value==='day';
+            pickHourDate.style.display = isDay? 'none':'block';
+            pickDayStart.style.display = isDay? 'block':'none';
+            timeLabel.textContent = isDay? 'Chọn ngày bắt đầu (7N)':'Chọn ngày dự đoán';
+            refresh();
+        });
+        pickHourDate.addEventListener('change', refresh);
+        pickDayStart.addEventListener('change', refresh);
+    // Pagination events
+    document.getElementById('btnBarPrev').addEventListener('click', ()=>{ if (barPage>1){ barPage--; refresh(); }});
+    document.getElementById('btnBarNext').addEventListener('click', ()=>{ barPage++; refresh(); });
+    document.getElementById('btnAlertsPrev').addEventListener('click', ()=>{ if (alertsPage>1){ alertsPage--; refresh(); }});
+    document.getElementById('btnAlertsNext').addEventListener('click', ()=>{ alertsPage++; refresh(); });
+
+        // dark mode
+        const btnDark = document.getElementById('btnDark');
+        btnDark.addEventListener('click', ()=>{
+            document.body.classList.toggle('dark');
+            refresh();
+        });
+
+    // first paint
+    populateStores();
+    initDatePickers();
+    populateProducts();
+    // ensure correct picker visible based on default mode
+    const isDayInit = fTimeMode.value==='day';
+    pickHourDate.style.display = isDayInit? 'none':'block';
+    pickDayStart.style.display = isDayInit? 'block':'none';
+    timeLabel.textContent = isDayInit? 'Chọn ngày bắt đầu (7N)':'Chọn ngày dự đoán';
+    refresh();
+    </script>
+</body>
+</html>

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tải dữ liệu | ERP Inventory Demo</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link href="../assets/css/styles.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  
+</head>
+<body>
+  <!-- Top Navigation -->
+  <nav class="navbar app-nav sticky-top">
+    <div class="container-fluid px-3 px-md-4">
+      <div class="d-flex align-items-center gap-2">
+        <span class="bg-primary-subtle text-primary p-2 rounded-3"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+        <span class="fw-semibold">Tải dữ liệu</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <a href="dashboard.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+        <a href="forecast.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-magnifying-glass-chart"></i> Forecast</a>
+        <a href="alert.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-bell"></i> Cảnh báo</a>
+        <a href="inventory.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-box"></i> Tồn kho</a>
+        <a href="report.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-chart-pie"></i> Báo cáo</a>
+        <button id="btnDark" class="btn btn-sm btn-outline-secondary" aria-label="Đổi giao diện sáng/tối"><i class="fa-solid fa-moon"></i></button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid px-3 px-md-4 py-4">
+    <section class="card card-soft p-3 p-md-4">
+      <div class="stepper" id="wizardSteps">
+        <div class="step active" data-step="1"><span class="num">1</span><span>Upload file</span></div>
+        <div class="step" data-step="2"><span class="num">2</span><span>Chọn dòng tiêu đề</span></div>
+        <div class="step" data-step="3"><span class="num">3</span><span>Ánh xạ cột</span></div>
+        <div class="step" data-step="4"><span class="num">4</span><span>Kiểm tra & Nạp</span></div>
+      </div>
+
+      <!-- Step 1 -->
+      <div id="step-1" class="step-pane">
+        <div class="alert alert-primary d-flex align-items-center gap-2" role="alert">
+          <i class="fa-solid fa-circle-info"></i>
+          <div>Bước 1: Tải file .xlsx, .xls hoặc .csv. Bạn cũng có thể dán JSON.</div>
+        </div>
+        <div id="dropzone" class="dropzone mb-3">
+          <div class="mb-1"><i class="fa-solid fa-file-arrow-up me-1"></i> Kéo thả tệp vào đây</div>
+          <div class="small text-muted">hoặc</div>
+          <div class="mt-1">
+            <label for="fileInput" class="btn btn-sm btn-outline-primary"><i class="fa-regular fa-folder-open"></i> Chọn tệp</label>
+            <input id="fileInput" type="file" accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="d-none" />
+          </div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-auto"><button id="btnLoadSampleCsv" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-flask"></i> Mẫu CSV</button></div>
+          <div class="col-auto"><button id="btnLoadSampleApi" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-server"></i> Mẫu API</button></div>
+          <div class="col-auto"><button id="btnClear" class="btn btn-sm btn-outline-danger"><i class="fa-regular fa-trash-can"></i> Xóa</button></div>
+        </div>
+        <div class="card card-soft p-3">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="m-0">Mock API JSON</h6>
+            <button id="btnParseApi" class="btn btn-sm btn-primary"><i class="fa-solid fa-download"></i> Nạp JSON</button>
+          </div>
+          <textarea id="apiTextarea" class="form-control" rows="5" placeholder='[ {"date":"2025-11-01","region":"South",...}, ... ]'></textarea>
+        </div>
+        <div class="text-end mt-3"><button id="next-1" class="btn btn-primary" disabled>Tiếp tục</button></div>
+      </div>
+
+      <!-- Step 2 -->
+      <div id="step-2" class="step-pane" style="display:none;">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h6 class="m-0">Chọn dòng tiêu đề</h6>
+          <small id="step2Meta" class="text-muted"></small>
+        </div>
+        <div class="table-wrap">
+          <table class="table table-sm table-hover align-middle m-0 sortable">
+            <thead id="thead2"></thead>
+            <tbody id="tbody2"></tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-between mt-3">
+          <button id="prev-2" class="btn btn-outline-secondary">Quay lại</button>
+          <button id="next-2" class="btn btn-primary" disabled>Tiếp tục</button>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div id="step-3" class="step-pane" style="display:none;">
+        <h6 class="mb-3">Ánh xạ cột</h6>
+        <div class="mapping-grid" id="mappingGrid"></div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button id="btnAutoMap" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-wand-magic-sparkles"></i> Tự động</button>
+          <button id="btnSaveMap" class="btn btn-sm btn-outline-secondary"><i class="fa-regular fa-bookmark"></i> Lưu</button>
+        </div>
+        <div id="mapHint" class="small text-muted mt-2"></div>
+        <div class="d-flex justify-content-between mt-3">
+          <button id="prev-3" class="btn btn-outline-secondary">Quay lại</button>
+          <button id="next-3" class="btn btn-primary" disabled>Tiếp tục</button>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div id="step-4" class="step-pane" style="display:none;">
+        <div class="row g-3">
+          <div class="col-12 col-xxl-8">
+            <div class="card card-soft p-3 h-100">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <h6 class="m-0">Xem trước dữ liệu (tối đa 10 dòng)</h6>
+                <span id="previewMeta" class="small text-muted"></span>
+              </div>
+              <div class="table-wrap">
+                <table class="table table-sm table-hover align-middle m-0 sortable">
+                  <thead id="thead"></thead>
+                  <tbody id="tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-xxl-4">
+            <div class="card card-soft p-3 h-100">
+              <h6 class="mb-2">Tóm tắt & Kiểm tra</h6>
+              <ul class="list-group list-group-flush" id="summaryList">
+                <li class="list-group-item">Chưa có dữ liệu</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex justify-content-between mt-3">
+          <button id="prev-4" class="btn btn-outline-secondary">Quay lại</button>
+          <button id="btnCommit" class="btn btn-success" disabled><i class="fa-regular fa-circle-check"></i> Nạp dữ liệu</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="toastOK" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body"><i class="fa-regular fa-circle-check me-1"></i> Nạp dữ liệu thành công (demo)!</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+    <div id="toastWarn" class="toast align-items-center text-bg-warning border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body"><i class="fa-solid fa-triangle-exclamation me-1"></i> Vui lòng hoàn tất mapping trước khi nạp.</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../vendor/mock-data.js"></script>
+  <script src="../vendor/table-sort.js"></script>
+  <script>
+    // Wizard state
+    let currentStep = 1;
+    function setStep(n){
+      currentStep = n;
+      for (let i=1;i<=4;i++){
+        const pane = document.getElementById('step-'+i);
+        if (pane) pane.style.display = (i===n?'block':'none');
+        const stepEl = document.querySelector('.stepper .step[data-step="'+i+'"]');
+        if (stepEl){ stepEl.classList.toggle('active', i===n); stepEl.classList.toggle('done', i<n); }
+      }
+    }
+    // ---------- Utilities ----------
+    const REQUIRED_FIELDS = [
+      'date','region','store','category','sku','product','forecast','actual','stockRemaining'
+    ];
+    const FIELD_LABELS = {
+      date: 'Ngày', region: 'Khu vực', store: 'Cửa hàng', category: 'Danh mục', sku: 'SKU', product: 'Sản phẩm', forecast: 'Dự báo', actual: 'Thực tế', stockRemaining: 'Tồn kho'
+    };
+    const SYNONYMS = {
+      date: ['date','ngay','day','ngày','time','timestamp'],
+      region: ['region','khu_vuc','khu vực','kv','vung','vùng'],
+      store: ['store','cua_hang','cửa hàng','shop','branch','pos'],
+      category: ['category','danh_muc','danh mục','group','cat'],
+      sku: ['sku','code','mã','ma','product_code'],
+      product: ['product','ten','tên','name','item','product_name'],
+      forecast: ['forecast','du_bao','dự báo','predicted','plan','fcst'],
+      actual: ['actual','thuc_te','thực tế','sales','sold','reality'],
+      stockRemaining: ['stockremaining','ton_kho','tồn kho','stock','inventory','onhand']
+    };
+
+    function detectDelimiter(text){
+      const sample = text.split(/\r?\n/).slice(0,3);
+      const candidates = [',',';','\t','|'];
+      let best = ','; let bestScore = -1;
+      for (const d of candidates){
+        const counts = sample.map(l => (l.match(new RegExp(d, 'g'))||[]).length);
+        const score = counts.reduce((a,b)=>a+b,0);
+        if (score > bestScore){ best = d; bestScore = score; }
+      }
+      return best;
+    }
+
+    function parseCSV(text){
+      const delim = detectDelimiter(text);
+      const rows = [];
+      let i=0, field='', inQuotes=false, row=[];
+      function pushField(){ row.push(field); field=''; }
+      function pushRow(){ rows.push(row); row=[]; }
+      while (i < text.length){
+        const c = text[i];
+        if (inQuotes){
+          if (c === '"' && text[i+1] === '"'){ field += '"'; i+=2; continue; }
+          if (c === '"'){ inQuotes = false; i++; continue; }
+          field += c; i++; continue;
+        }
+        if (c === '"'){ inQuotes = true; i++; continue; }
+        if (c === delim){ pushField(); i++; continue; }
+        if (c === '\n'){ pushField(); pushRow(); i++; continue; }
+        if (c === '\r'){ i++; continue; }
+        field += c; i++;
+      }
+      // last field/row
+      if (field.length>0 || row.length>0){ pushField(); pushRow(); }
+      // remove empty trailing rows
+      while (rows.length && rows[rows.length-1].every(x=>x.trim()==='')) rows.pop();
+      return rows;
+    }
+
+    function toObjects(rows){
+      if (!rows || rows.length === 0) return { headers: [], items: [] };
+      const headers = rows[0].map(h => h.trim());
+      const items = rows.slice(1).map(r => Object.fromEntries(headers.map((h,idx)=>[h, (r[idx]??'').trim()])));
+      return { headers, items };
+    }
+
+    function guessMapping(headers){
+      const map = {};
+      const norm = s => s.toLowerCase().replace(/[^a-z0-9_\u00C0-\u1EF9]/gi,'').trim();
+      for (const h of headers){
+        const n = norm(h);
+        for (const key of Object.keys(SYNONYMS)){
+          for (const syn of SYNONYMS[key]){
+            if (n === norm(syn)) { if (!map[key]) map[key] = h; }
+          }
+        }
+      }
+      return map;
+    }
+
+    function buildMappingUI(headers, saved){
+      const grid = document.getElementById('mappingGrid');
+      grid.innerHTML = '';
+      REQUIRED_FIELDS.forEach(f => {
+        const id = 'map_' + f;
+        const sel = document.createElement('select');
+        sel.className = 'form-select form-select-sm';
+        sel.id = id;
+        sel.innerHTML = ['<option value="">— Chọn cột —</option>']
+          .concat(headers.map(h => `<option>${h}</option>`)).join('');
+        const label = document.createElement('label');
+        label.className = 'form-label small mb-1';
+        label.textContent = FIELD_LABELS[f] + ' (' + f + ')';
+        const wrap = document.createElement('div');
+        wrap.appendChild(label);
+        wrap.appendChild(sel);
+        grid.appendChild(wrap);
+      });
+      // apply guessed/saved
+      const guess = guessMapping(headers);
+      REQUIRED_FIELDS.forEach(f => {
+        const el = document.getElementById('map_' + f);
+        const chosen = (saved && saved[f]) || guess[f] || '';
+        if (chosen){ el.value = chosen; }
+      });
+      updateMapHint();
+    }
+
+    function getMapping(){
+      const out = {};
+      REQUIRED_FIELDS.forEach(f => {
+        const el = document.getElementById('map_' + f);
+        out[f] = el ? el.value : '';
+      });
+      return out;
+    }
+
+    function checkMapping(map){
+      const missing = REQUIRED_FIELDS.filter(f => !map[f]);
+      return { ok: missing.length === 0, missing };
+    }
+
+    function updateMapHint(){
+      const m = getMapping();
+      const check = checkMapping(m);
+      const hint = document.getElementById('mapHint');
+      if (check.ok) hint.textContent = 'Đã ánh xạ đủ trường bắt buộc.';
+      else hint.textContent = 'Thiếu: ' + check.missing.map(f=>FIELD_LABELS[f] + ' ('+f+')').join(', ');
+      const next3 = document.getElementById('next-3'); if (next3) next3.disabled = !check.ok;
+    }
+
+    function parseDate(val){
+      if (!val) return null;
+      // try YYYY-MM-DD first, then Date.parse fallback
+      const m = /^\d{4}-\d{2}-\d{2}$/.exec(val.trim());
+      if (m) return new Date(val + 'T00:00:00');
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    // KPIs like dashboard (simplified)
+    function calcKPIs(items){
+      const sum = (arr, sel) => arr.reduce((t,x)=> t + (sel? sel(x): x), 0);
+      const fSum = sum(items, r => r.forecast || 0);
+      const aSum = sum(items, r => r.actual || 0);
+      const hit = fSum ? aSum / fSum : 0;
+      const mape = items.length ? sum(items, r => {
+        const f = Math.max(1, +r.forecast || 0);
+        const a = +r.actual || 0;
+        return Math.abs(a - f)/f;
+      })/items.length : 0;
+      const waste = fSum ? sum(items, r => Math.max(0, (+r.forecast||0) - (+r.actual||0)))/fSum : 0;
+      const oos = items.length ? (items.filter(r => (+r.stockRemaining||0) <= 0).length / items.length) : 0;
+      const products = new Set(items.map(r => r.product)).size;
+      const dates = items.map(r => r.date).filter(Boolean).sort((a,b)=>a-b);
+      const dateRange = dates.length? { from: dates[0], to: dates[dates.length-1] } : null;
+      return { hit, mape, waste, oos, fSum, aSum, products, dateRange };
+    }
+
+    function fmtPct(x){ return (x*100).toFixed(1) + '%'; }
+    function fmtDate(d){ return d ? (d.getDate().toString().padStart(2,'0') + '/' + (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getFullYear()) : '—'; }
+
+    function renderSummary(items){
+      const s = calcKPIs(items);
+      const ul = document.getElementById('summaryList');
+      ul.innerHTML = '';
+      ul.insertAdjacentHTML('beforeend', `<li class="list-group-item d-flex justify-content-between"><span>Tổng bản ghi</span><strong>${items.length}</strong></li>`);
+      ul.insertAdjacentHTML('beforeend', `<li class="list-group-item d-flex justify-content-between"><span>Số sản phẩm</span><strong>${s.products}</strong></li>`);
+      ul.insertAdjacentHTML('beforeend', `<li class="list-group-item d-flex justify-content-between"><span>Tổng Forecast</span><strong>${s.fSum}</strong></li>`);
+      ul.insertAdjacentHTML('beforeend', `<li class="list-group-item d-flex justify-content-between"><span>Tổng Actual</span><strong>${s.aSum}</strong></li>`);
+      ul.insertAdjacentHTML('beforeend', `<li class="list-group-item d-flex justify-content-between"><span>Hit</span><strong>${fmtPct(s.hit)}</strong></li>`);
+      ul.insertAdjacentHTML('beforeend', `<li class="list-group-item d-flex justify-content-between"><span>MAPE</span><strong>${fmtPct(s.mape)}</strong></li>`);
+      ul.insertAdjacentHTML('beforeend', `<li class="list-group-item d-flex justify-content-between"><span>% Stock-out</span><strong>${fmtPct(s.oos)}</strong></li>`);
+      ul.insertAdjacentHTML('beforeend', `<li class="list-group-item d-flex justify-content-between"><span>% Waste</span><strong>${fmtPct(s.waste)}</strong></li>`);
+      const dr = s.dateRange; 
+      ul.insertAdjacentHTML('beforeend', `<li class="list-group-item d-flex justify-content-between"><span>Khoảng ngày</span><strong>${fmtDate(dr?.from)} → ${fmtDate(dr?.to)}</strong></li>`);
+    }
+
+    function showToast(id){
+      const el = document.getElementById(id);
+      if (!el) return;
+      const t = new bootstrap.Toast(el);
+      t.show();
+    }
+
+    // ---------- State ----------
+  let rawRows = []; let headerRowIndex = null; let currentRaw = { headers: [], items: [] }; // after choosing header
+
+    // ---------- UI elements ----------
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const thead = document.getElementById('thead');
+    const tbody = document.getElementById('tbody');
+
+    // ---------- Rendering ----------
+    function renderPreview(raw){
+      const headers = raw.headers || [];
+      const items = raw.items || [];
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+      if (!headers.length){
+        document.getElementById('previewMeta').textContent = '';
+        return;
+      }
+      thead.insertAdjacentHTML('beforeend', '<tr>' + headers.map(h=>`<th class="small text-nowrap">${h}</th>`).join('') + '</tr>');
+      const rows = items.slice(0,10);
+      rows.forEach(r => {
+        const tds = headers.map(h => `<td class="small">${(r[h]??'')}</td>`).join('');
+        tbody.insertAdjacentHTML('beforeend', `<tr>${tds}</tr>`);
+      });
+      document.getElementById('previewMeta').textContent = `${rows.length}/${items.length} dòng hiển thị`;
+      if (window.TableSortEnhance) TableSortEnhance();
+    }
+    function renderHeaderChooser(){
+      const thead2 = document.getElementById('thead2'); const tbody2 = document.getElementById('tbody2');
+      if (!thead2||!tbody2) return;
+      thead2.innerHTML = '<tr><th></th>' + (rawRows[0]||[]).map((_,i)=>`<th>Col ${i+1}</th>`).join('') + '</tr>';
+      tbody2.innerHTML='';
+      const max = Math.min(rawRows.length, 15);
+      for (let i=0;i<max;i++){
+        const row = rawRows[i]||[];
+        const radio = `<input type="radio" name="hdr" value="${i}" ${headerRowIndex===i?'checked':''}>`;
+        tbody2.insertAdjacentHTML('beforeend', `<tr><td>${radio}</td>${row.map(v=>`<td class='small'>${String(v)}</td>`).join('')}</tr>`);
+      }
+      const meta = document.getElementById('step2Meta'); if (meta) meta.textContent = `${rawRows.length} dòng • Hiển thị ${Math.min(rawRows.length,15)}`;
+      const next2 = document.getElementById('next-2'); if (next2) next2.disabled = (headerRowIndex==null);
+      if (window.TableSortEnhance) TableSortEnhance();
+    }
+    function applyHeaderSelection(){
+      if (headerRowIndex==null) return;
+      const headers = (rawRows[headerRowIndex]||[]).map(h=> String(h||'').trim());
+      const dataRows = rawRows.slice(headerRowIndex+1);
+      const items = dataRows.map(r => Object.fromEntries(headers.map((h,idx)=>[h, String(r[idx]??'').trim()])));
+      currentRaw = { headers, items };
+    }
+
+    function loadRawFromObjects(arr){
+      if (!arr || !arr.length){ currentRaw = { headers: [], items: [] }; renderPreview(currentRaw); return; }
+      const headers = Object.keys(arr[0]);
+      currentRaw = { headers, items: arr };
+      renderPreview(currentRaw);
+      const saved = JSON.parse(localStorage.getItem('mapping.v1')||'{}');
+      buildMappingUI(headers, saved);
+    }
+
+    // ---------- Handlers ----------
+    function handleText(text){
+      // try CSV
+      const rows = parseCSV(text);
+      if (rows.length && rows[0].length){ rawRows = rows; headerRowIndex = 0; renderHeaderChooser(); document.getElementById('next-1').disabled=false; setStep(2); return; }
+      // try JSON
+      try {
+        const obj = JSON.parse(text);
+        if (Array.isArray(obj)){
+          const headers = Object.keys(obj[0]||{});
+          rawRows = [headers].concat(obj.map(o => headers.map(h=> String(o[h]??''))));
+          headerRowIndex = 0; renderHeaderChooser(); document.getElementById('next-1').disabled=false; setStep(2);
+          return;
+        }
+      } catch(e) {}
+      alert('Không nhận diện được định dạng. Hãy tải CSV hoặc JSON array.');
+    }
+
+    fileInput.addEventListener('change', (e)=>{
+      const file = e.target.files?.[0]; if (!file) return;
+      const ext = (file.name.split('.').pop()||'').toLowerCase();
+      if (['xlsx','xls'].includes(ext)){
+        file.arrayBuffer().then(buf=>{
+          const wb = XLSX.read(buf, { type:'array' }); const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header:1 }); rawRows = rows.map(r => r.map(v=>String(v??'')));
+          headerRowIndex=0; renderHeaderChooser(); document.getElementById('next-1').disabled=false; setStep(2);
+        });
+      } else {
+        const reader = new FileReader(); reader.onload = ev => handleText(String(ev.target?.result||'')); reader.readAsText(file,'utf-8');
+      }
+    });
+
+    ;['dragenter','dragover'].forEach(evt => dropzone.addEventListener(evt, (e)=>{ e.preventDefault(); dropzone.classList.add('dragover'); }));
+    ;['dragleave','drop'].forEach(evt => dropzone.addEventListener(evt, (e)=>{ e.preventDefault(); dropzone.classList.remove('dragover'); }));
+    dropzone.addEventListener('drop', (e)=>{
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev)=> handleText(String(ev.target?.result || ''));
+      reader.readAsText(file, 'utf-8');
+    });
+
+    document.getElementById('btnParseApi').addEventListener('click', ()=>{
+      handleText(document.getElementById('apiTextarea').value || '');
+    });
+
+    document.getElementById('btnAutoMap').addEventListener('click', ()=>{
+      const headers = currentRaw.headers || [];
+      if (!headers.length) return;
+      const guessed = guessMapping(headers);
+      REQUIRED_FIELDS.forEach(f => {
+        const el = document.getElementById('map_' + f);
+        el.value = guessed[f] || '';
+      });
+      updateMapHint();
+    });
+
+    document.getElementById('btnSaveMap').addEventListener('click', ()=>{
+      const m = getMapping();
+      localStorage.setItem('mapping.v1', JSON.stringify(m));
+      showToast('toastOK');
+    });
+
+    // Wizard nav
+    document.getElementById('next-1').addEventListener('click', ()=> setStep(2));
+    document.getElementById('prev-2').addEventListener('click', ()=> setStep(1));
+    document.getElementById('next-2').addEventListener('click', ()=>{ applyHeaderSelection(); const saved=JSON.parse(localStorage.getItem('mapping.v1')||'{}'); buildMappingUI(currentRaw.headers, saved); updateMapHint(); setStep(3); });
+    document.getElementById('prev-3').addEventListener('click', ()=> setStep(2));
+    document.getElementById('next-3').addEventListener('click', ()=>{
+      const m = getMapping(); const canon = (currentRaw.items||[]).map(r => ({
+        date: parseDate(r[m.date]), region: r[m.region], store: r[m.store], category: r[m.category], sku: r[m.sku], product: r[m.product], forecast: +r[m.forecast]||0, actual: +r[m.actual]||0, stockRemaining: +r[m.stockRemaining]||0
+      }));
+      renderPreview({ headers: Object.keys(canon[0]||{}), items: canon.map(x=>({ ...x, date: fmtDate(x.date) })) });
+      renderSummary(canon);
+      const issues = canon.filter(x=> !x.date || isNaN(x.date) ).length; // simple date check
+      const commitBtn = document.getElementById('btnCommit'); commitBtn.disabled = issues>0;
+      setStep(4);
+    });
+    document.getElementById('prev-4').addEventListener('click', ()=> setStep(3));
+    document.getElementById('btnCommit').addEventListener('click', ()=>{
+      const m = getMapping(); const canon = (currentRaw.items||[]).map(r => ({
+        date: parseDate(r[m.date]), region: r[m.region], store: r[m.store], category: r[m.category], sku: r[m.sku], product: r[m.product], forecast: +r[m.forecast]||0, actual: +r[m.actual]||0, stockRemaining: +r[m.stockRemaining]||0
+      })); if (canon.some(x=>!x.date||isNaN(x.date))){ showToast('toastWarn'); return; }
+      try { MockData.setDataset(canon); showToast('toastOK'); } catch(e){ alert(e.message); }
+    });
+
+    document.getElementById('btnClear').addEventListener('click', ()=>{
+      currentRaw = { headers: [], items: [] }; rawRows=[]; headerRowIndex=null;
+      ['thead','tbody','thead2','tbody2','mappingGrid','summaryList'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=''; });
+      document.getElementById('previewMeta').textContent=''; document.getElementById('apiTextarea').value='';
+      document.getElementById('next-1').disabled=true; document.getElementById('next-2').disabled=true; document.getElementById('next-3').disabled=true; document.getElementById('btnCommit').disabled=true;
+      setStep(1);
+    });
+
+    // ---------- Sample Data ----------
+    function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
+    function sampleObjects(){
+      // Use shared dataset (first 7 days subset) for alignment across pages
+      const data = MockData.getDataset();
+      const isoSet = new Set();
+      const out=[];
+      for (const r of data){
+        const iso = r.date.toISOString().slice(0,10);
+        if (isoSet.size >= 7 && !isoSet.has(iso)) continue;
+        isoSet.add(iso);
+        out.push({
+          date: iso,
+            region: r.region, store: r.store, category: r.category,
+            sku: r.sku, product: r.product,
+            forecast: r.forecast, actual: r.actual,
+            stockRemaining: r.stockRemaining
+        });
+      }
+      return out;
+    }
+
+    function toCSV(arr){
+      if (!arr.length) return '';
+      const headers = Object.keys(arr[0]);
+      const esc = v => {
+        const s = String(v??'');
+        if (/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+        return s;
+      };
+      const lines = [headers.join(',')].concat(arr.map(o => headers.map(h=>esc(o[h])).join(',')));
+      return lines.join('\n');
+    }
+
+    document.getElementById('btnLoadSampleCsv').addEventListener('click', ()=>{
+      const arr = sampleObjects();
+      const csv = toCSV(arr);
+      handleText(csv);
+    });
+
+    document.getElementById('btnLoadSampleApi').addEventListener('click', ()=>{
+      const arr = sampleObjects();
+      document.getElementById('apiTextarea').value = JSON.stringify(arr, null, 2);
+    });
+
+    // ---------- Dark mode ----------
+    document.getElementById('btnDark').addEventListener('click', ()=>{
+      document.body.classList.toggle('dark');
+    });
+
+    // init: load empty mapping UI so users see required fields
+    (function init(){ setStep(1); })();
+  </script>
+</body>
+</html>

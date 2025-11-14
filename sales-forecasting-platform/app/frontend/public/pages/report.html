@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Báo cáo hiệu suất | ERP Inventory Demo</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link href="../assets/css/styles.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  
+</head>
+<body>
+  <!-- Top Navigation -->
+  <nav class="navbar app-nav sticky-top">
+    <div class="container-fluid px-3 px-md-4">
+      <div class="d-flex align-items-center gap-2">
+        <span class="bg-primary-subtle text-primary p-2 rounded-3"><i class="fa-solid fa-chart-pie"></i></span>
+        <span class="fw-semibold">Báo cáo hiệu suất</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <a href="dashboard.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+        <a href="forecast.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-magnifying-glass-chart"></i> Forecast</a>
+        <a href="alert.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-bell"></i> Cảnh báo</a>
+        <a href="inventory.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-box"></i> Tồn kho</a>
+        <a href="upload.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-cloud-arrow-up"></i> Tải dữ liệu</a>
+        <button id="btnDark" class="btn btn-sm btn-outline-secondary" aria-label="Đổi giao diện sáng/tối"><i class="fa-solid fa-moon"></i></button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="reportRoot" class="container-fluid px-3 px-md-4 py-4">
+    <!-- Filters -->
+    <section class="card card-soft p-3 p-md-4 mb-4">
+      <div class="row g-3 align-items-end">
+        <div class="col-6 col-md-3">
+          <label class="form-label">Khoảng thời gian</label>
+          <select id="fRange" class="form-select">
+            <option value="7">7 ngày</option>
+            <option value="30" selected>30 ngày</option>
+            <option value="90">90 ngày</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Tổng hợp theo</label>
+          <select id="fGran" class="form-select">
+            <option value="day" selected>Ngày</option>
+            <option value="week">Tuần</option>
+            <option value="month">Tháng</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Khu vực</label>
+          <select id="fRegion" class="form-select">
+            <option value="all" selected>Tất cả</option>
+            <option>Hà Nội</option>
+            <option>Đà Nẵng</option>
+            <option>Hồ Chí Minh</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Danh mục</label>
+          <select id="fCategory" class="form-select">
+            <option value="all" selected>Tất cả</option>
+            <option>Thực phẩm</option>
+            <option>Đồ uống</option>
+            <option>Gia dụng</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3 ms-auto d-flex gap-2 justify-content-end">
+          <button id="btnExportPdf" class="btn btn-outline-secondary"><i class="fa-regular fa-file-pdf"></i> Xuất PDF</button>
+          <button id="btnExportCsv" class="btn btn-primary"><i class="fa-solid fa-file-arrow-down"></i> Xuất Excel (CSV)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPIs -->
+    <section class="row g-3 mb-4">
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-soft p-3 h-100">
+          <div class="d-flex align-items-center gap-3">
+            <span class="kpi-icon bg-primary-subtle text-primary d-grid place-items-center" style="width:42px;height:42px;border-radius:12px;"><i class="fa-solid fa-money-bill-trend-up"></i></span>
+            <div>
+              <div class="text-muted small">Doanh số</div>
+              <div class="fw-bold fs-4" id="kpiSales">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-soft p-3 h-100">
+          <div class="d-flex align-items-center gap-3">
+            <span class="kpi-icon bg-info-subtle text-info d-grid place-items-center" style="width:42px;height:42px;border-radius:12px;"><i class="fa-solid fa-square-root-variable"></i></span>
+            <div>
+              <div class="text-muted small">MAPE (toàn hệ thống)</div>
+              <div class="fw-bold fs-4" id="kpiMape">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-soft p-3 h-100">
+          <div class="d-flex align-items-center gap-3">
+            <span class="kpi-icon bg-warning-subtle text-warning d-grid place-items-center" style="width:42px;height:42px;border-radius:12px;"><i class="fa-solid fa-wave-square"></i></span>
+            <div>
+              <div class="text-muted small">Sai lệch TB</div>
+              <div class="fw-bold fs-4" id="kpiDeviation">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-soft p-3 h-100">
+          <div class="d-flex align-items-center gap-3">
+            <span class="kpi-icon bg-success-subtle text-success d-grid place-items-center" style="width:42px;height:42px;border-radius:12px;"><i class="fa-solid fa-cloud-rain"></i></span>
+            <div>
+              <div class="text-muted small">Tác động thời tiết</div>
+              <div class="fw-bold fs-6" id="kpiWeather">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="row g-3 mb-3">
+      <div class="col-12 col-xl-8">
+        <div class="card card-soft p-3 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="m-0">Doanh số & Dự báo theo thời gian</h6>
+          </div>
+          <div class="chart-wrap tall"><canvas id="lineSales"></canvas></div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <div class="card card-soft p-3 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="m-0">Sai lệch theo thời gian</h6>
+          </div>
+          <div class="chart-wrap"><canvas id="barDeviation"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="row g-3 mb-3">
+      <div class="col-12 col-xl-6">
+        <div class="card card-soft p-3 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="m-0">MAPE theo danh mục</h6>
+          </div>
+          <div class="chart-wrap"><canvas id="barMapeCat"></canvas></div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-6">
+        <div class="card card-soft p-3 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="m-0">MAPE theo khu vực</h6>
+          </div>
+          <div class="chart-wrap"><canvas id="barMapeRegion"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="card card-soft p-3 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="m-0">Tác động thời tiết (Mưa / Nhiệt độ) & Nhu cầu</h6>
+          </div>
+          <div class="chart-wrap tall"><canvas id="weatherChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Top lists -->
+    <section class="row g-3">
+      <div class="col-12 col-xxl-6">
+        <div class="card card-soft p-3 h-100">
+          <h6 class="mb-2">Top sản phẩm bán chạy</h6>
+          <div class="table-responsive" style="max-height:360px;">
+            <table class="table table-sm align-middle sortable">
+              <thead><tr><th>#</th><th>Sản phẩm</th><th>Danh mục</th><th class="text-end">Doanh số</th></tr></thead>
+              <tbody id="tblTopSell"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-xxl-6">
+        <div class="card card-soft p-3 h-100">
+          <h6 class="mb-2">Top sản phẩm sai lệch cao</h6>
+          <div class="table-responsive" style="max-height:360px;">
+            <table class="table table-sm align-middle sortable">
+              <thead><tr><th>#</th><th>Sản phẩm</th><th>Danh mục</th><th class="text-end">MAPE</th></tr></thead>
+              <tbody id="tblTopDev"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-12">
+        <div class="card card-soft p-3">
+          <h6 class="mb-2">Cửa hàng có tỷ lệ hết hàng lớn</h6>
+          <div class="table-responsive" style="max-height:360px;">
+            <table class="table table-sm align-middle sortable">
+              <thead><tr><th>#</th><th>Cửa hàng</th><th>Khu vực</th><th class="text-end">% Stock-out</th></tr></thead>
+              <tbody id="tblOOS"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../vendor/mock-data.js"></script>
+  <script src="../vendor/table-sort.js"></script>
+  <script>
+    // -----------------------
+    // Mock data generation
+    // -----------------------
+    const regionMapUI = { 'Hà Nội':'North', 'Đà Nẵng':'Central', 'Hồ Chí Minh':'South' };
+    const products = [
+      { sku: 'SKU-A', name: 'Áo thun', category: 'Gia dụng', region: 'South', store: 'HCM-01' },
+      { sku: 'SKU-B', name: 'Cà phê lon', category: 'Đồ uống', region: 'South', store: 'HCM-01' },
+      { sku: 'SKU-C', name: 'Mì ly', category: 'Thực phẩm', region: 'North', store: 'HN-02' },
+      { sku: 'SKU-D', name: 'Khăn giấy', category: 'Gia dụng', region: 'Central', store: 'DN-03' },
+      { sku: 'SKU-E', name: 'Nước suối', category: 'Đồ uống', region: 'Central', store: 'DN-03' },
+      { sku: 'SKU-U', name: 'Bánh bông lan', category: 'Thực phẩm', region: 'South', store: 'HCM-02' },
+      { sku: 'SKU-V', name: 'Nước ép', category: 'Đồ uống', region: 'South', store: 'HCM-03' },
+      { sku: 'SKU-W', name: 'Gạo thơm', category: 'Thực phẩm', region: 'North', store: 'HN-01' },
+      { sku: 'SKU-X', name: 'Trà hoa quả', category: 'Đồ uống', region: 'North', store: 'HN-03' },
+      { sku: 'SKU-Y', name: 'Giấy vệ sinh', category: 'Gia dụng', region: 'Central', store: 'DN-01' },
+      { sku: 'SKU-Z', name: 'Nước lau sàn', category: 'Gia dụng', region: 'Central', store: 'DN-02' }
+    ];
+
+    function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
+
+    // Create raw daily records for N days per product
+    function buildRaw(days){
+      const raw=[];
+      for (let d=0; d<days; d++){
+        const date = daysAgo(d);
+        for (const p of products){
+          const isWeekend = [0,6].includes(date.getDay());
+          const temp = 24 + (Math.sin((d/7)*Math.PI)*6) + (isWeekend?1.5:0); // mock temp trend
+          const rain = Math.max(0, 10 + (Math.cos((d/5)*Math.PI)*12) + (Math.random()*8-4)); // mm
+          const base = 18 + (p.category==='Đồ uống'?12:0) + (isWeekend?5:0);
+          // Weather effects: rain reduces demand slightly, temp increases drinks demand
+          const weatherFactor = 1 + (p.category==='Đồ uống' ? (temp-24)*0.012 : 0) - (rain>15?0.08:0) - (rain>25?0.07:0);
+          const forecast = Math.max(1, Math.round((base + Math.random()*6-3) * weatherFactor));
+          const actual = Math.max(0, Math.round(forecast + (Math.random()*12-6)));
+          const stock = Math.max(0, 60 - (actual + d*2) + Math.floor(Math.random()*8-4));
+          raw.push({
+            date: new Date(date.getFullYear(), date.getMonth(), date.getDate()),
+            region: p.region, store: p.store, category: p.category,
+            sku: p.sku, product: p.name,
+            forecast, actual,
+            stockRemaining: stock,
+            weather: { rain, temp }
+          });
+        }
+      }
+      return raw;
+    }
+
+    // -----------------------
+    // Aggregation helpers
+    // -----------------------
+    function startOfWeek(d){ const r=new Date(d); const day=r.getDay()||7; r.setDate(r.getDate()-day+1); r.setHours(0,0,0,0); return r; }
+    function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+    function keyByGran(d, gran){
+      if (gran==='week'){ const s=startOfWeek(d); return `${s.getFullYear()}-W${String(Math.ceil(((d - new Date(d.getFullYear(),0,1))/86400000 + new Date(d.getFullYear(),0,1).getDay()+1)/7)).padStart(2,'0')}`; }
+      if (gran==='month'){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    function fmtKeyPretty(k, gran){
+      if (gran==='month'){ const [y,m]=k.split('-'); return `${m}/${y}`; }
+      if (gran==='week'){ return k; }
+      const [y,m,d]=k.split('-'); return `${d}/${m}`;
+    }
+    function groupBy(arr, keyFn){ return arr.reduce((m,x)=>{ const k=keyFn(x); (m[k]||(m[k]=[])).push(x); return m; },{}); }
+    function sum(arr, sel){ return arr.reduce((t,x)=>t + (sel? sel(x): x), 0); }
+    function average(arr){ return arr.length? (arr.reduce((a,b)=>a+b,0)/arr.length) : 0; }
+
+    function filterData(raw){
+      const range = +document.getElementById('fRange').value;
+      const gran = document.getElementById('fGran').value;
+      const uiRegion = document.getElementById('fRegion').value;
+      const uiCat = document.getElementById('fCategory').value;
+      const cutoff = daysAgo(range-1); cutoff.setHours(0,0,0,0);
+      const regionCode = regionMapUI[uiRegion] || uiRegion;
+      return raw.filter(r => r.date >= cutoff &&
+        (uiRegion==='all' || r.region===regionCode) &&
+        (uiCat==='all' || r.category===uiCat));
+    }
+
+    function calcKPIs(data){
+      const fSum = sum(data, r=>r.forecast);
+      const aSum = sum(data, r=>r.actual);
+      const hit = fSum? aSum/fSum : 0;
+      const mape = data.length? average(data.map(r => Math.abs((r.actual - r.forecast)/Math.max(1,r.forecast)))) : 0;
+      const dev = data.length? average(data.map(r => Math.abs(r.actual - r.forecast))) : 0;
+      // Weather impact proxy: correlation-ish between rain/temp and deviation sign
+      const rainEff = average(data.map(r => (r.weather?.rain||0) * ((r.forecast - r.actual))));
+      const tempEff = average(data.map(r => (r.weather?.temp||0) * (r.actual - r.forecast)));
+      return { sales: aSum, mape, deviation: dev, weather: { rainEff, tempEff } };
+    }
+
+    function buildSeries(raw){
+      const gran = document.getElementById('fGran').value;
+      const filtered = filterData(raw);
+      const byKey = groupBy(filtered, r => keyByGran(r.date, gran));
+      const keys = Object.keys(byKey).sort();
+      const labels = keys.map(k => fmtKeyPretty(k, gran));
+      const sales = keys.map(k => sum(byKey[k], r=>r.actual));
+      const forecast = keys.map(k => sum(byKey[k], r=>r.forecast));
+      const deviation = keys.map((_,i) => Math.abs(sales[i] - forecast[i]));
+      const weatherRain = keys.map(k => average(byKey[k].map(r=> r.weather?.rain || 0)));
+      const weatherTemp = keys.map(k => average(byKey[k].map(r=> r.weather?.temp || 0)));
+
+      // MAPE by category and region
+      const byCat = groupBy(filtered, r=>r.category);
+      const catLabels = Object.keys(byCat);
+      const catMape = catLabels.map(c => average(byCat[c].map(r => Math.abs((r.actual - r.forecast)/Math.max(1,r.forecast)))));
+      const byRegion = groupBy(filtered, r=>r.region);
+      const regionLabels = Object.keys(byRegion);
+      const regionMape = regionLabels.map(c => average(byRegion[c].map(r => Math.abs((r.actual - r.forecast)/Math.max(1,r.forecast)))));
+
+      // Top lists
+      const byProduct = groupBy(filtered, r=>r.product + '|' + r.category);
+      const pairs = Object.entries(byProduct).map(([k,items]) => {
+        const [name,cat] = k.split('|');
+        return {
+          name, cat,
+          sales: sum(items, r=>r.actual),
+          mape: average(items.map(r => Math.abs((r.actual - r.forecast)/Math.max(1,r.forecast))))
+        };
+      });
+      const topSell = [...pairs].sort((a,b)=> b.sales - a.sales).slice(0,10);
+      const topDev = [...pairs].sort((a,b)=> b.mape - a.mape).slice(0,10);
+
+      const byStore = groupBy(filtered, r=> r.store + '|' + r.region);
+      const stores = Object.entries(byStore).map(([k,items]) => {
+        const [store, region] = k.split('|');
+        // stock-out rate: percentage of items with stockRemaining<=0
+        const oos = items.length? (items.filter(x => x.stockRemaining<=0).length / items.length) : 0;
+        return { store, region, oos };
+      });
+      const topOOS = stores.sort((a,b)=> b.oos - a.oos).slice(0,10);
+
+      return { labels, sales, forecast, deviation, weatherRain, weatherTemp, catLabels, catMape, regionLabels, regionMape, topSell, topDev, topOOS, filtered };
+    }
+
+    // -----------------------
+    // Rendering
+    // -----------------------
+    let chartLine, chartBarDev, chartMapeCat, chartMapeRegion, chartWeather;
+    const ctxLine = ()=> document.getElementById('lineSales');
+    const ctxDev  = ()=> document.getElementById('barDeviation');
+    const ctxCat  = ()=> document.getElementById('barMapeCat');
+    const ctxReg  = ()=> document.getElementById('barMapeRegion');
+    const ctxWeather = ()=> document.getElementById('weatherChart');
+
+    function fmtPct(x){ return (x*100).toFixed(1) + '%'; }
+    function withTheme(){
+      const cs = getComputedStyle(document.body);
+      return {
+        tick: { color: cs.getPropertyValue('--muted') },
+        grid: cs.getPropertyValue('--border'),
+        font: cs.getPropertyValue('--fg')
+      };
+    }
+
+    function renderKPIs(stats){
+      document.getElementById('kpiSales').textContent = stats.sales.toLocaleString('vi-VN');
+      document.getElementById('kpiMape').textContent = fmtPct(stats.mape);
+      document.getElementById('kpiDeviation').textContent = Math.round(stats.deviation).toLocaleString('vi-VN');
+      const rainTxt = stats.weather.rainEff < 0 ? `Mưa có xu hướng giảm nhu cầu` : `Mưa có xu hướng tăng nhu cầu`;
+      const tempTxt = stats.weather.tempEff > 0 ? `Nhiệt độ cao tăng nhu cầu đồ uống` : `Nhiệt độ thấp giảm nhu cầu đồ uống`;
+      document.getElementById('kpiWeather').textContent = `${rainTxt}; ${tempTxt}`;
+    }
+
+    function renderCharts(series){
+      const t = withTheme();
+      // Line Sales vs Forecast
+      if (chartLine) chartLine.destroy();
+      chartLine = new Chart(ctxLine(), {
+        type: 'line',
+        data: {
+          labels: series.labels,
+          datasets: [
+            { label: 'Thực tế', data: series.sales, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.16)', tension: .3, pointRadius: 2 },
+            { label: 'Dự báo', data: series.forecast, borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,.18)', borderDash: [6,6], tension: .3, pointRadius: 2 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { ...t.tick, autoSkip: true, maxRotation: 0, font: { size: 11 } }, grid: { color: t.grid } },
+            y: { ticks: { ...t.tick, font: { size: 11 } }, beginAtZero: true, grid: { color: t.grid } }
+          },
+          plugins: { legend: { labels: { color: t.font } }, tooltip: { backgroundColor: 'rgba(17,24,39,.85)', titleColor: '#fff', bodyColor: '#fff', borderColor: t.grid, borderWidth: 1 } }
+        }
+      });
+
+      // Deviation bar
+      if (chartBarDev) chartBarDev.destroy();
+      chartBarDev = new Chart(ctxDev(), {
+        type: 'bar',
+        data: { labels: series.labels, datasets: [ { label: 'Sai lệch', data: series.deviation, backgroundColor: 'rgba(234,179,8,.75)', borderRadius: 6 } ] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: { x: { ticks: { ...t.tick, font: { size: 11 } }, grid: { display: false } }, y: { ticks: { ...t.tick, font: { size: 11 } }, beginAtZero: true, grid: { color: t.grid } } },
+          plugins: { legend: { labels: { color: t.font } }, tooltip: { backgroundColor: 'rgba(17,24,39,.85)', titleColor: '#fff', bodyColor: '#fff', borderColor: t.grid, borderWidth: 1 } }
+        }
+      });
+
+      // MAPE by Category
+      if (chartMapeCat) chartMapeCat.destroy();
+      chartMapeCat = new Chart(ctxCat(), {
+        type: 'bar',
+        data: { labels: series.catLabels, datasets: [ { label: 'MAPE', data: series.catMape.map(x=> (x*100).toFixed(1)), backgroundColor: 'rgba(99,102,241,.75)', borderRadius: 6 } ] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { ...t.tick } }, y: { ticks: { ...t.tick }, beginAtZero: true, grid: { color: t.grid } } }, plugins: { legend: { labels: { color: t.font } } } }
+      });
+
+      // MAPE by Region
+      if (chartMapeRegion) chartMapeRegion.destroy();
+      chartMapeRegion = new Chart(ctxReg(), {
+        type: 'bar',
+        data: { labels: series.regionLabels, datasets: [ { label: 'MAPE', data: series.regionMape.map(x=> (x*100).toFixed(1)), backgroundColor: 'rgba(56,189,248,.75)', borderRadius: 6 } ] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { ...t.tick } }, y: { ticks: { ...t.tick }, beginAtZero: true, grid: { color: t.grid } } }, plugins: { legend: { labels: { color: t.font } } } }
+      });
+
+      // Weather chart (rain/temp vs demand)
+      if (chartWeather) chartWeather.destroy();
+      chartWeather = new Chart(ctxWeather(), {
+        type: 'bar',
+        data: {
+          labels: series.labels,
+          datasets: [
+            { type: 'line', label: 'Nhu cầu (Thực tế)', data: series.sales, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.16)', yAxisID: 'y' },
+            { type: 'bar',  label: 'Mưa (mm)', data: series.weatherRain, backgroundColor: 'rgba(96,165,250,.6)', yAxisID: 'y1' },
+            { type: 'line', label: 'Nhiệt độ (°C)', data: series.weatherTemp, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,.2)', yAxisID: 'y2' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { ...t.tick, font: { size: 11 } }, grid: { color: t.grid } },
+            y:  { position: 'left', ticks: { ...t.tick }, grid: { color: t.grid } },
+            y1: { position: 'right', ticks: { ...t.tick }, grid: { drawOnChartArea: false } },
+            y2: { position: 'right', ticks: { ...t.tick }, grid: { drawOnChartArea: false } }
+          },
+          plugins: { legend: { labels: { color: t.font } }, tooltip: { backgroundColor: 'rgba(17,24,39,.85)', titleColor: '#fff', bodyColor: '#fff', borderColor: t.grid, borderWidth: 1 } }
+        }
+      });
+    }
+
+    function renderTopTables(series){
+      const elSell = document.getElementById('tblTopSell');
+      const elDev  = document.getElementById('tblTopDev');
+      const elOOS  = document.getElementById('tblOOS');
+      elSell.innerHTML = '';
+      elDev.innerHTML  = '';
+      elOOS.innerHTML  = '';
+
+      series.topSell.forEach((x,i)=>{
+        elSell.insertAdjacentHTML('beforeend', `<tr><td>${i+1}</td><td>${x.name}</td><td>${x.cat}</td><td class="text-end">${x.sales.toLocaleString('vi-VN')}</td></tr>`);
+      });
+      series.topDev.forEach((x,i)=>{
+        elDev.insertAdjacentHTML('beforeend', `<tr><td>${i+1}</td><td>${x.name}</td><td>${x.cat}</td><td class="text-end">${(x.mape*100).toFixed(1)}%</td></tr>`);
+      });
+      series.topOOS.forEach((x,i)=>{
+        elOOS.insertAdjacentHTML('beforeend', `<tr><td>${i+1}</td><td>${x.store}</td><td>${x.region}</td><td class="text-end">${(x.oos*100).toFixed(1)}%</td></tr>`);
+      });
+      if (window.TableSortEnhance) TableSortEnhance();
+    }
+
+    // -----------------------
+    // Export
+    // -----------------------
+    async function exportPDF(){
+      const root = document.getElementById('reportRoot');
+      const canvas = await html2canvas(root, { scale: 2, backgroundColor: null });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jspdf.jsPDF('p','mm','a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 10; // 5mm margin each side
+      const imgHeight = canvas.height * imgWidth / canvas.width;
+      const pages = Math.ceil(imgHeight / (pageHeight-10));
+      for (let i=0;i<pages;i++){
+        if (i>0) pdf.addPage();
+        const sY = (i*(pageHeight-10)) * canvas.width / (pageWidth-10);
+        const sH = (pageHeight-10) * canvas.width / (pageWidth-10);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width; pageCanvas.height = sH;
+        const ctx = pageCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, -sY);
+        const pageImg = pageCanvas.toDataURL('image/png');
+        pdf.addImage(pageImg, 'PNG', 5, 5, imgWidth, pageHeight-10);
+      }
+      pdf.save(`report_${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+
+    function downloadCSV(filename, rows){
+      const header = Object.keys(rows[0] || {});
+      const esc = s => '"' + String(s??'').replace(/"/g,'""') + '"';
+      const csv = [header.join(','), ...rows.map(r => header.map(h => esc(r[h])).join(','))].join('\r\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+    }
+
+    function exportCSV(series, stats){
+      const rows1 = series.labels.map((lbl, i)=>({
+        Ky: lbl,
+        DoanhSo: series.sales[i],
+        DuBao: series.forecast[i],
+        SaiLech: series.deviation[i],
+        Mua_mm: series.weatherRain[i].toFixed(1),
+        NhietDo_C: series.weatherTemp[i].toFixed(1)
+      }));
+      downloadCSV(`report_timeseries_${new Date().toISOString().slice(0,10)}.csv`, rows1);
+
+      const rows2 = series.catLabels.map((c,i)=>({ DanhMuc: c, MAPE: (series.catMape[i]*100).toFixed(1) + '%' }));
+      downloadCSV(`report_mape_by_category_${new Date().toISOString().slice(0,10)}.csv`, rows2);
+
+      const rows3 = series.regionLabels.map((c,i)=>({ KhuVuc: c, MAPE: (series.regionMape[i]*100).toFixed(1) + '%' }));
+      downloadCSV(`report_mape_by_region_${new Date().toISOString().slice(0,10)}.csv`, rows3);
+
+      const rows4 = series.topSell.map((x,i)=>({ Rank: i+1, SanPham: x.name, DanhMuc: x.cat, DoanhSo: x.sales }));
+      downloadCSV(`report_top_selling_${new Date().toISOString().slice(0,10)}.csv`, rows4);
+
+      const rows5 = series.topDev.map((x,i)=>({ Rank: i+1, SanPham: x.name, DanhMuc: x.cat, MAPE: (x.mape*100).toFixed(1) + '%' }));
+      downloadCSV(`report_top_deviation_${new Date().toISOString().slice(0,10)}.csv`, rows5);
+
+      const rows6 = series.topOOS.map((x,i)=>({ Rank: i+1, CuaHang: x.store, KhuVuc: x.region, StockOutPct: (x.oos*100).toFixed(1) + '%' }));
+      downloadCSV(`report_store_oos_${new Date().toISOString().slice(0,10)}.csv`, rows6);
+    }
+
+    // -----------------------
+    // Orchestration
+    // -----------------------
+  // Use shared dataset instead of generating isolated data
+  let RAW = MockData.getDataset();
+
+    function refresh(){
+      // reload in case upload page changed dataset
+      RAW = MockData.getDataset();
+      const filtered = filterData(RAW);
+      const stats = calcKPIs(filtered);
+      renderKPIs(stats);
+      const series = buildSeries(RAW);
+      renderCharts(series);
+      renderTopTables(series);
+      return { series, stats };
+    }
+
+    document.getElementById('fRange').addEventListener('change', refresh);
+    document.getElementById('fGran').addEventListener('change', refresh);
+    document.getElementById('fRegion').addEventListener('change', refresh);
+    document.getElementById('fCategory').addEventListener('change', refresh);
+
+    document.getElementById('btnExportPdf').addEventListener('click', exportPDF);
+    document.getElementById('btnExportCsv').addEventListener('click', ()=>{
+      const { series, stats } = refresh();
+      exportCSV(series, stats);
+    });
+
+    document.getElementById('btnDark').addEventListener('click', ()=>{ document.body.classList.toggle('dark'); refresh(); });
+
+    // first paint
+    refresh();
+  </script>
+</body>
+</html>

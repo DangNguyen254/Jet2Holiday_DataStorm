@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Forecast</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link href="../assets/css/styles.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+</head>
+<body>
+  <nav class="navbar app-nav sticky-top">
+    <div class="container-fluid px-3 px-md-4">
+      <div class="d-flex align-items-center gap-2">
+        <span class="bg-primary-subtle text-primary p-2 rounded-3"><i class="fa-solid fa-magnifying-glass-chart"></i></span>
+        <span class="fw-semibold">Forecast</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <a href="dashboard.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+        <a href="alert.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-bell"></i> Cảnh báo</a>
+        <a href="inventory.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-box"></i> Tồn kho</a>
+        <a href="report.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-chart-pie"></i> Báo cáo</a>
+        <a href="upload.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-cloud-arrow-up"></i> Tải dữ liệu</a>
+        <button id="btnDark" class="btn btn-sm btn-outline-secondary" aria-label="Đổi giao diện sáng/tối"><i class="fa-solid fa-moon"></i></button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid px-3 px-md-4 py-4">
+
+    <!-- Filters (đồng bộ với dashboard) -->
+    <section class="card card-soft p-3 p-md-4 mb-4" aria-label="Bộ lọc Forecast">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-3">
+          <label class="form-label">Dự đoán</label>
+          <select id="fTimeMode" class="form-select">
+            <option value="hour" selected>Theo giờ</option>
+            <option value="day">Theo ngày</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label" id="timeLabel">Chọn ngày dự đoán</label>
+          <div class="d-flex align-items-center gap-2">
+            <input type="date" id="pickHourDate" class="form-control" aria-label="Chọn ngày cho chế độ theo giờ">
+            <input type="date" id="pickDayStart" class="form-control" style="display:none;" aria-label="Chọn ngày bắt đầu (7N)">
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Khu vực</label>
+          <select id="fRegion" class="form-select">
+            <option value="all" selected>Tất cả</option>
+            <option>Hà Nội</option>
+            <option>Đà Nẵng</option>
+            <option>Hồ Chí Minh</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Cửa hàng</label>
+          <select id="fStore" class="form-select">
+            <option value="all" selected>Tất cả</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Danh mục</label>
+          <select id="fCategory" class="form-select">
+            <option value="all" selected>Tất cả</option>
+            <option>Thực phẩm</option>
+            <option>Đồ uống</option>
+            <option>Gia dụng</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Sản phẩm</label>
+          <select id="fProduct" class="form-select">
+            <option value="all" selected>Tất cả</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Chart -->
+    <section class="card card-soft p-3 p-md-4 mb-4">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="m-0">Biểu đồ thời gian — Actual vs Forecast</h6>
+        <div class="text-muted small">Overlay: 
+          <span id="btnOverlayRain" class="overlay-toggle text-info"><i class="fa-solid fa-cloud-rain me-1"></i>Mưa</span>,
+          <span id="btnOverlayPromo" class="overlay-toggle text-warning"><i class="fa-solid fa-tags me-1"></i>Khuyến mãi</span>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="tsChart"></canvas></div>
+    </section>
+
+    <!-- Table + Export -->
+    <section class="card card-soft p-3 p-md-4">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="m-0" id="tblTitle">Bảng dữ liệu</h6>
+        <button id="btnCsv" class="btn btn-sm btn-primary"><i class="fa-solid fa-file-arrow-down me-1"></i>Xuất CSV</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Dự báo (y_hat)</th>
+              <th>Thực tế</th>
+              <th>Stock-out</th>
+              <th>Mưa</th>
+              <th>Khuyến mãi</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../vendor/mock-data.js"></script>
+  <script>
+    // ------- Data & utils (shared dataset) -------
+    const now = new Date();
+    function dayStart(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+    function addDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+    function iso(d){ return dayStart(d).toISOString().slice(0,10); }
+    function fmtDay(d){ return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0'); }
+    function sum(arr, sel){ return arr.reduce((t,x)=> t + (sel? sel(x): x), 0); }
+
+    const regionMap = MockData.regionMap;
+    const raw = MockData.getDataset().map(r => ({
+      date: new Date(r.date.getFullYear(), r.date.getMonth(), r.date.getDate()),
+      region: r.region, store: r.store, category: r.category,
+      sku: r.sku, product: r.product,
+      forecast: r.forecast, actual: r.actual,
+      stockRemaining: r.stockRemaining,
+      rain: !!(r.weather && +r.weather.rain > 12),
+      promo: false
+    }));
+
+    // ------- UI wiring -------
+  const fTimeMode = document.getElementById('fTimeMode');
+  const pickHourDate = document.getElementById('pickHourDate');
+  const pickDayStart = document.getElementById('pickDayStart');
+  const fRegion = document.getElementById('fRegion');
+  const fStore = document.getElementById('fStore');
+  const fCategory = document.getElementById('fCategory');
+  const fProduct = document.getElementById('fProduct');
+  const timeLabel = document.getElementById('timeLabel');
+    const tbody = document.getElementById('tbody');
+    const tblTitle = document.getElementById('tblTitle');
+
+    
+    function populateStores(){
+      const uiRegion = fRegion.value;
+      const code = regionMap[uiRegion] || uiRegion;
+      const stores = [...new Set(raw.filter(r=> uiRegion==='all' ? true : r.region===code).map(r=> r.store))].sort();
+      fStore.innerHTML = '<option value="all" selected>Tất cả</option>' + stores.map(s=>`<option>${s}</option>`).join('');
+    }
+    function populateProducts(){
+      const cat = fCategory.value;
+      const names = [...new Set(raw.filter(r=> cat==='all' ? true : r.category===cat).map(r=> r.product))].sort();
+      fProduct.innerHTML = '<option value="all" selected>Tất cả</option>' + names.map(n=>`<option>${n}</option>`).join('');
+    }
+    function initDatePickers(){
+      const today = new Date();
+      const isoToday = iso(today);
+      pickHourDate.value = isoToday;
+      const start = addDays(today,-6);
+      pickDayStart.value = iso(start);
+    }
+
+    // ------- Data shaping -------
+    function applyFilters(){
+      const uiRegion = fRegion.value;
+      const regionCode = regionMap[uiRegion] || uiRegion;
+      let inRange;
+      if (fTimeMode.value==='day'){
+        const startIso = pickDayStart.value;
+        const startDate = new Date(startIso+'T00:00:00');
+        const endDate = addDays(startDate,6);
+        inRange = (d)=> d >= dayStart(startDate) && d <= dayStart(endDate);
+      } else {
+        const dayIso = pickHourDate.value;
+        inRange = (d)=> iso(d) === dayIso;
+      }
+      return raw.filter(r =>
+        inRange(r.date) &&
+        (uiRegion==='all'|| r.region===regionCode) &&
+        (fStore.value==='all'|| r.store===fStore.value) &&
+        (fCategory.value==='all'|| r.category===fCategory.value) &&
+        (fProduct.value==='all' || r.product===fProduct.value)
+      );
+    }
+    function buildBuckets(data){
+      if (fTimeMode.value==='hour'){
+        const chosen = pickHourDate.value;
+        const items = data.filter(r=> iso(r.date)===chosen);
+        let fDay = sum(items, x=>x.forecast);
+        let aDay = sum(items, x=>x.actual||0);
+        if(!fDay) fDay = 100;
+        const weights = Array.from({length:12},()=> 0.7 + Math.random()*0.6);
+        const wSum = weights.reduce((a,b)=>a+b,0)||1;
+        const labels = Array.from({length:12},(_,i)=> String(i*2).padStart(2,'0')+':00');
+        const forecast = weights.map(w=> Math.round(fDay*(w/wSum)));
+        const todayIso = iso(now);
+        const chosenDate = new Date(chosen+'T00:00:00');
+        const todayStart = dayStart(now);
+        const actual = (chosenDate >= todayStart)? new Array(12).fill(null) : weights.map(w=> Math.round(aDay*(w/wSum)));
+        const rainIdx = Math.random()<0.5? [2+Math.floor(Math.random()*3)] : [];
+        const promoIdx = Math.random()<0.4? [6+Math.floor(Math.random()*3)] : [];
+        const events = labels.map((t,i)=>({ time:t, rain: rainIdx.includes(i), promo: promoIdx.includes(i) }));
+        return { mode:'hour', labels, forecast, actual, events };
+      } else {
+        const startIso = pickDayStart.value;
+        const startDate = new Date(startIso+'T00:00:00');
+        const days = []; for(let i=0;i<7;i++){ const d=addDays(startDate,i); days.push(d); }
+        const labels = days.map(d=> fmtDay(d));
+        const todayIso = iso(now);
+        const actual=[]; const forecast=[]; const events=[];
+        const y = addDays(now,-1); const yIso = iso(y);
+        const yItems = data.filter(r=> iso(r.date)===yIso);
+        let prevF = sum(yItems, x=>x.forecast);
+        if(!prevF){
+          const pastVals=[]; for(let i=1;i<=7;i++){ const dd=addDays(now,-i); const k=iso(dd); pastVals.push(sum(data.filter(r=> iso(r.date)===k), x=>x.forecast)); }
+          const valid = pastVals.filter(v=>v>0); prevF = valid.length? valid.reduce((a,b)=>a+b,0)/valid.length : 120;
+        }
+        days.forEach(d=>{
+          const keyIso = iso(d);
+          const items = data.filter(r=> iso(r.date)===keyIso);
+          let fVal = sum(items, x=>x.forecast);
+          if(!fVal) fVal = Math.round(prevF*(0.97 + Math.random()*0.05));
+          forecast.push(fVal); prevF=fVal;
+          actual.push(keyIso>=todayIso? null : sum(items, x=>x.actual||0));
+          events.push({ time:keyIso, rain: items.some(x=>x.rain), promo: items.some(x=>x.promo) });
+        });
+        return { mode:'day', labels, forecast, actual, events };
+      }
+    }
+
+    // ------- Chart & table -------
+    const ctx = document.getElementById('tsChart');
+    let chart;
+    // Scenario toggles (persist across re-renders)
+    let scenarioRain = false;
+    let scenarioPromo = false;
+    const btnOverlayRain = document.getElementById('btnOverlayRain');
+    const btnOverlayPromo = document.getElementById('btnOverlayPromo');
+    function updateOverlayButtons(){
+      if(btnOverlayRain){ btnOverlayRain.classList.toggle('active', scenarioRain); }
+      if(btnOverlayPromo){ btnOverlayPromo.classList.toggle('active', scenarioPromo); }
+    }
+    function render(){
+  const data = applyFilters();
+  const buckets = buildBuckets(data);
+      const labels = buckets.labels;
+      const forecast = buckets.forecast;
+      const actual = buckets.actual;
+
+  // Scatter overlays removed per latest requirement (chỉ cần line dự báo)
+
+      if(chart) chart.destroy();
+      const gridColor = getComputedStyle(document.body).getPropertyValue('--border');
+      const fontColor = getComputedStyle(document.body).getPropertyValue('--fg');
+      const commonTicks = { color: getComputedStyle(document.body).getPropertyValue('--muted') };
+      // Build datasets array with optional scenario lines
+      // Apply scenario adjustments directly onto the main forecast line (thay thế hoàn toàn)
+      let adjForecast = forecast.slice();
+      let forecastLabel = 'Dự báo';
+      let forecastColor = '#60a5fa';
+      let forecastFill = 'rgba(96,165,250,.18)';
+      if (scenarioRain && scenarioPromo){
+        adjForecast = adjForecast.map(v=> Math.round(v * 0.90 * 1.15));
+        forecastLabel = 'Dự báo (Mưa + Khuyến mãi)';
+        forecastColor = '#8b5cf6'; // tím cho kết hợp
+        forecastFill = 'rgba(139,92,246,.18)';
+      } else if (scenarioRain){
+        adjForecast = adjForecast.map(v=> Math.round(v * 0.90));
+        forecastLabel = 'Dự báo (Mưa)';
+        forecastColor = '#3b82f6'; // xanh lam đậm
+        forecastFill = 'rgba(59,130,246,.18)';
+      } else if (scenarioPromo){
+        adjForecast = adjForecast.map(v=> Math.round(v * 1.15));
+        forecastLabel = 'Dự báo (Khuyến mãi)';
+        forecastColor = '#f59e0b'; // cam
+        forecastFill = 'rgba(245,158,11,.18)';
+      }
+      const datasets = [
+        { label: forecastLabel, data: adjForecast, borderColor:forecastColor, backgroundColor:forecastFill, borderDash:[6,6], tension:.3, pointRadius:3, pointHoverRadius:6, hidden:false },
+        { label:'Thực tế', data: actual, borderColor:'#34d399', backgroundColor:'rgba(52,211,153,.16)', tension:.3, pointRadius:3, pointHoverRadius:6, hidden:false }
+      ];
+
+      chart = new Chart(ctx, {
+        type:'line',
+        data:{ labels, datasets },
+        options:{ responsive:true, maintainAspectRatio:false,
+          interaction:{ mode:'index', intersect:false },
+          scales:{ x:{ ticks:{ ...commonTicks, autoSkip:true, maxRotation:0, font:{size:11} }, grid:{ color:gridColor } }, y:{ beginAtZero:true, ticks:{ ...commonTicks, font:{size:11} }, grid:{ color:gridColor } } },
+          plugins:{ 
+            legend:{ labels:{ color:fontColor } }, 
+            tooltip:{ backgroundColor:'rgba(17,24,39,.85)', titleColor:'#fff', bodyColor:'#fff', borderColor:gridColor, borderWidth:1 } 
+          }
+        }
+      });
+      updateOverlayButtons();
+
+        // Table
+        tblTitle.textContent = buckets.mode==='hour'? 'Bảng dữ liệu theo giờ' : 'Bảng dữ liệu theo ngày';
+      tbody.innerHTML = '';
+      labels.forEach((lab, i)=>{
+        const so = forecast[i] > 0 && (actual[i]!==null) ? (actual[i] >= forecast[i] ? 'Có nguy cơ' : '') : '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${lab}</td>
+          <td>${forecast[i] ?? ''}</td>
+          <td>${actual[i] ?? ''}</td>
+          <td>${so}</td>
+          <td>${buckets.events[i].rain? '<i class="fa-solid fa-cloud-rain text-info"></i>':''}</td>
+          <td>${buckets.events[i].promo? '<i class="fa-solid fa-tags text-warning"></i>':''}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ------- CSV export -------
+    function exportCSV(){
+      const rows = Array.from(tbody.querySelectorAll('tr')).map(tr=> Array.from(tr.children).map(td=> (td.textContent||'').trim()));
+      const header = ['Thời gian','Dự báo (y_hat)','Thực tế','Stock-out','Mưa','Khuyến mãi'];
+      const csv = [header, ...rows].map(r=> r.map(x=> '"'+x.replaceAll('"','""')+'"').join(',')).join('\n');
+      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `forecast_export_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+
+    // ------- Events & init -------
+  document.getElementById('btnCsv').addEventListener('click', exportCSV);
+  // Overlay toggle via icons
+  if (btnOverlayRain) btnOverlayRain.addEventListener('click', ()=>{ scenarioRain = !scenarioRain; updateOverlayButtons(); render(); });
+  if (btnOverlayPromo) btnOverlayPromo.addEventListener('click', ()=>{ scenarioPromo = !scenarioPromo; updateOverlayButtons(); render(); });
+    fRegion.addEventListener('change', ()=>{ populateStores(); fStore.value='all'; render(); });
+    fStore.addEventListener('change', render);
+    fCategory.addEventListener('change', ()=>{ populateProducts(); fProduct.value='all'; render(); });
+    fProduct.addEventListener('change', render);
+    fTimeMode.addEventListener('change', ()=>{
+      const isDay = fTimeMode.value==='day';
+      pickHourDate.style.display = isDay? 'none':'block';
+      pickDayStart.style.display = isDay? 'block':'none';
+      timeLabel.textContent = isDay? 'Chọn ngày bắt đầu (7N)' : 'Chọn ngày dự đoán';
+      render();
+    });
+    pickHourDate.addEventListener('change', render);
+    pickDayStart.addEventListener('change', render);
+    document.getElementById('btnDark').addEventListener('click', ()=>{ document.body.classList.toggle('dark'); render(); });
+    // First paint
+    populateStores();
+    populateProducts();
+    initDatePickers();
+    // show correct pickers for default mode
+    pickHourDate.style.display='block'; pickDayStart.style.display='none';
+    timeLabel.textContent='Chọn ngày dự đoán';
+    render();
+  </script>
+</body>
+</html>

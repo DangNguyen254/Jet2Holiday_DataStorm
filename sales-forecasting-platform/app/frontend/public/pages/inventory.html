@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tồn kho & Bù hàng | ERP Inventory Demo</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet" />
+  <link href="../assets/css/styles.css" rel="stylesheet" />
+
+  
+</head>
+<body>
+  <nav class="navbar app-nav sticky-top">
+    <div class="container-fluid px-3 px-md-4">
+      <div class="d-flex align-items-center gap-2">
+        <span class="bg-primary-subtle text-primary p-2 rounded-3"><i class="fa-solid fa-box"></i></span>
+        <span class="fw-semibold">Tồn kho & Bù hàng</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <a href="dashboard.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+        <a href="forecast.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-magnifying-glass-chart"></i> Forecast</a>
+        <a href="alert.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-bell"></i> Cảnh báo</a>
+        <a href="report.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-chart-pie"></i> Báo cáo</a>
+        <a href="upload.html" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-cloud-arrow-up"></i> Tải dữ liệu</a>
+        <button id="btnDark" class="btn btn-sm btn-outline-secondary" aria-label="Đổi giao diện sáng/tối"><i class="fa-solid fa-moon"></i></button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid px-3 px-md-4 py-4">
+    <section class="card card-soft p-3 p-md-4 mb-4">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-3">
+          <label class="form-label">Chế độ thời gian</label>
+          <select id="fMode" class="form-select">
+            <option value="hour" selected>Theo giờ</option>
+            <option value="day">Theo ngày</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Ngày bắt đầu</label>
+          <input id="startDate" type="date" class="form-control" />
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Khu vực</label>
+          <select id="fRegion" class="form-select">
+            <option value="all" selected>Tất cả</option>
+            <option>Hà Nội</option>
+            <option>Đà Nẵng</option>
+            <option>Hồ Chí Minh</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Cửa hàng</label>
+          <select id="fStore" class="form-select">
+            <option value="all" selected>Tất cả</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Danh mục</label>
+          <select id="fCategory" class="form-select">
+            <option value="all" selected>Tất cả</option>
+            <option>Thực phẩm</option>
+            <option>Đồ uống</option>
+            <option>Gia dụng</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Sản phẩm</label>
+          <select id="fProduct" class="form-select">
+            <option value="all" selected>Tất cả</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3 ms-auto d-flex gap-2 justify-content-end">
+          <button id="btnExport" class="btn btn-primary"><i class="fa-solid fa-file-arrow-down"></i> Xuất CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-soft p-3">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h6 class="m-0">Bảng dự đoán tồn kho</h6>
+        <small id="metaInfo" class="text-muted"></small>
+      </div>
+      <div class="table-responsive" style="max-height: 70vh;">
+  <table class="table table-sm align-middle sortable">
+          <thead>
+            <tr>
+              <th>Thời điểm</th>
+              <th class="text-end">Tồn hiện tại</th>
+              <th class="text-end">Dự báo nhu cầu</th>
+              <th class="text-end">Nhập hàng</th>
+              <th class="text-end">Tồn dự kiến</th>
+              <th class="text-end">Lead time (h)</th>
+              <th class="text-end">MOQ</th>
+              <th class="text-end">Safety stock</th>
+              <th>Cảnh báo</th>
+            </tr>
+          </thead>
+          <tbody id="tbl"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="row g-3 mt-3">
+      <div class="col-12 col-xl-6">
+        <div class="card card-soft p-3 h-100">
+          <h6 class="mb-2">Sparkline tồn dự kiến</h6>
+          <div style="height:120px"><canvas id="sparkline"></canvas></div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-6">
+        <div class="card card-soft p-3 h-100">
+          <h6 class="mb-2">Tham số chính sách (mô phỏng)</h6>
+          <div class="small text-muted">Các giá trị Lead time / MOQ / Safety stock được sinh ngẫu nhiên có kiểm soát để minh hoạ chiến lược bù hàng.</div>
+          <ul class="mt-2 small" id="policyInfo" style="max-height:120px;overflow:auto"></ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="../vendor/mock-data.js"></script>
+  <script src="../vendor/table-sort.js"></script>
+  <script>
+    // ---------- Helpers & State ----------
+    const regionMapUI = MockData.regionMap;
+    const fMode = document.getElementById('fMode');
+    const startDate = document.getElementById('startDate');
+    const fRegion = document.getElementById('fRegion');
+    const fStore = document.getElementById('fStore');
+    const fCategory = document.getElementById('fCategory');
+    const fProduct = document.getElementById('fProduct');
+  const elTbl = document.getElementById('tbl');
+  const elMeta = document.getElementById('metaInfo');
+  const sparkCtx = ()=> document.getElementById('sparkline');
+  let sparkChart;
+
+    function unique(arr){ return [...new Set(arr)]; }
+    function sum(arr, sel){ return arr.reduce((t,x)=> t + (sel?sel(x):x), 0); }
+
+    function initStartDate(){
+      const today = new Date();
+      startDate.value = today.toISOString().slice(0,10);
+    }
+
+    function populateStoresProducts(){
+      const data = MockData.getDataset();
+      const uiRegion = fRegion.value; const regionCode = regionMapUI[uiRegion] || uiRegion;
+      const byFilters = data.filter(r => (uiRegion==='all'||r.region===regionCode) && (fCategory.value==='all'||r.category===fCategory.value));
+      const stores = unique(byFilters.map(r=>r.store)).sort();
+      const products = unique(byFilters.map(r=>r.product)).sort();
+      fStore.innerHTML = '<option value="all" selected>Tất cả</option>' + stores.map(s=>`<option>${s}</option>`).join('');
+      fProduct.innerHTML = '<option value="all" selected>Tất cả</option>' + products.map(p=>`<option>${p}</option>`).join('');
+    }
+
+    function bucketHours(){ return Array.from({length:12}, (_,i)=> i*2).map(h => `${String(h).padStart(2,'0')}:00`); }
+    function bucketDays(n){ const s = new Date(startDate.value+'T00:00:00'); return Array.from({length:n}, (_,i)=>{ const d=new Date(s); d.setDate(s.getDate()+i); return d; }); }
+
+    function filterData(){
+      const data = MockData.getDataset();
+      const uiRegion = fRegion.value; const regionCode = regionMapUI[uiRegion] || uiRegion;
+      return data.filter(r =>
+        (uiRegion==='all'||r.region===regionCode) &&
+        (fStore.value==='all'||r.store===fStore.value) &&
+        (fCategory.value==='all'||r.category===fCategory.value) &&
+        (fProduct.value==='all'||r.product===fProduct.value)
+      );
+    }
+
+    function avgDemandPerDay(records){
+      // average daily actual demand per product/store from historical
+      const byDate = {};
+      for (const r of records){ const k = r.date.toISOString().slice(0,10); byDate[k] = (byDate[k]||0) + (r.actual||0); }
+      const vals = Object.values(byDate);
+      return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+    }
+
+    function simulateHour(records){
+      // Today hour buckets; distribute average day demand with weights
+      const hours = bucketHours();
+      const avgDay = avgDemandPerDay(records);
+      const weights = Array.from({length:hours.length}, ()=> 0.7 + Math.random()*0.6);
+      const wSum = weights.reduce((a,b)=>a+b,0)||1;
+      const demand = weights.map(w => Math.max(0, Math.round(avgDay * (w/wSum))));
+      return { labels: hours, demand };
+    }
+
+    function simulateDay(records, days=7){
+      const daysArr = bucketDays(days);
+      const avgDay = avgDemandPerDay(records);
+      const demand = daysArr.map((d,i)=> Math.max(0, Math.round(avgDay * (0.98 + Math.random()*0.04))));
+      return { labels: daysArr.map(d=> `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`), demand };
+    }
+
+    function currentStock(records){
+      // take latest-date sum stockRemaining as baseline
+      if (!records.length) return 0;
+      const byDate = {};
+      for (const r of records){ const k=r.date.toISOString().slice(0,10); (byDate[k]||(byDate[k]=[])).push(r); }
+      const latestKey = Object.keys(byDate).sort().pop();
+      return sum(byDate[latestKey], x=> x.stockRemaining||0);
+    }
+
+    // Chính sách bù hàng: tham số phụ thuộc bộ lọc hiện tại (deterministic random)
+    let policyCache = {};
+    function policyKey(){ return [fRegion.value, fStore.value, fCategory.value, fProduct.value].join('|'); }
+    function getPolicy(){
+      const k = policyKey();
+      if (policyCache[k]) return policyCache[k];
+      let seed = k.split('').reduce((t,ch)=> t + ch.charCodeAt(0), 0);
+      function rnd(min,max){ seed = (seed*9301 + 49297) % 233280; const r = seed/233280; return Math.round(min + r*(max-min)); }
+      const leadTimeHours = rnd(6, 36);
+      const moq = rnd(40, 180);
+      const safetyStock = rnd(50, 200);
+      return policyCache[k] = { leadTimeHours, moq, safetyStock };
+    }
+    function replenishPlanRow(remain, need, avgDay){
+      const { leadTimeHours, moq, safetyStock } = getPolicy();
+      const after = remain - need;
+      if (after >= safetyStock) return { inbound: 0, after, leadTimeHours, moq, safetyStock, note: '' };
+      const demandLead = Math.ceil(avgDay * (leadTimeHours/24));
+      let inbound = (safetyStock + demandLead) - after - need;
+      inbound = Math.max(inbound, moq, 0);
+      const newAfter = after + inbound;
+      return { inbound, after: newAfter, leadTimeHours, moq, safetyStock, note: 'Đề nghị nhập' };
+    }
+
+    function buildTable(){
+      const records = filterData();
+      const mode = fMode.value; // hour/day
+      const baseline = currentStock(records);
+      let series;
+      if (mode==='hour') series = simulateHour(records);
+      else series = simulateDay(records, 7);
+
+      let remain = baseline;
+      elTbl.innerHTML = '';
+      const avgDay = avgDemandPerDay(records) || 0;
+      // update policy info
+      const pol = getPolicy();
+      const policyList = document.getElementById('policyInfo');
+      if (policyList){
+        policyList.innerHTML = '<li><strong>Lead time:</strong> '+pol.leadTimeHours+' giờ</li>'+
+          '<li><strong>MOQ:</strong> '+pol.moq+'</li>'+
+          '<li><strong>Safety stock:</strong> '+pol.safetyStock+'</li>'+
+          '<li class="text-muted">(Giá trị mô phỏng cho demo)</li>';
+      }
+      const sparkData = [];
+      series.labels.forEach((lbl, i)=>{
+        const need = series.demand[i];
+        const plan = replenishPlanRow(remain, need, avgDay);
+        const warn = plan.after<=0 ? '<span class="badge text-bg-danger">Hết hàng</span>' : (plan.after < plan.safetyStock ? '<span class="badge text-bg-warning">Dưới an toàn</span>' : '');
+        elTbl.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td>${lbl}</td>
+            <td class="text-end">${remain}</td>
+            <td class="text-end">${need}</td>
+            <td class="text-end">${plan.inbound}</td>
+            <td class="text-end">${plan.after}</td>
+            <td class="text-end">${plan.leadTimeHours}</td>
+            <td class="text-end">${plan.moq}</td>
+            <td class="text-end">${plan.safetyStock}</td>
+            <td>${warn}</td>
+          </tr>
+        `);
+        remain = plan.after;
+        sparkData.push(remain);
+      });
+      elMeta.textContent = `Chế độ: ${mode==='hour'?'Giờ':'Ngày'} • Tồn baseline: ${baseline}`;
+      renderSpark(series.labels, sparkData);
+      if (window.TableSortEnhance) TableSortEnhance();
+    }
+
+    function exportCSV(){
+      const rows = [];
+      const trs = Array.from(elTbl.querySelectorAll('tr'));
+      trs.forEach(tr => {
+        const tds = tr.querySelectorAll('td');
+        rows.push({ ThoiDiem: tds[0].innerText, TonHienTai: tds[1].innerText, DuBao: tds[2].innerText, NhapHang: tds[3].innerText, TonDuKien: tds[4].innerText, LeadTime_h: tds[5].innerText, MOQ: tds[6].innerText, SafetyStock: tds[7].innerText, CanhBao: tds[8].innerText });
+      });
+      const header = Object.keys(rows[0]||{ThoiDiem:'',TonHienTai:'',DuBao:'',NhapHang:'',TonDuKien:'',LeadTime_h:'',MOQ:'',SafetyStock:'',CanhBao:''});
+      const esc = s => '"' + String(s??'').replace(/"/g,'""') + '"';
+      const csv = [header.join(','), ...rows.map(r => header.map(h => esc(r[h])).join(','))].join('\r\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `inventory_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
+    }
+
+    function renderSpark(labels, data){
+      if (!sparkCtx) return;
+      if (sparkChart) sparkChart.destroy();
+      sparkChart = new Chart(sparkCtx(), {
+        type: 'line',
+        data: { labels, datasets: [ { data, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.15)', tension: .3, fill: true, pointRadius: 0 } ] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { display:false }, y: { display:false } }, plugins: { legend: { display:false }, tooltip: { enabled:false } } }
+      });
+    }
+
+    // events
+    document.getElementById('btnDark').addEventListener('click', ()=>{ document.body.classList.toggle('dark'); buildTable(); });
+    fMode.addEventListener('change', buildTable);
+    [fRegion, fStore, fCategory, fProduct].forEach(el => el.addEventListener('change', buildTable));
+    startDate.addEventListener('change', buildTable);
+    document.getElementById('btnExport').addEventListener('click', exportCSV);
+
+    // init
+    initStartDate();
+    populateStoresProducts();
+    buildTable();
+
+    // dependent select refreshers
+    fRegion.addEventListener('change', ()=>{ populateStoresProducts(); fStore.value='all'; fProduct.value='all'; buildTable(); });
+    fCategory.addEventListener('change', ()=>{ populateStoresProducts(); fStore.value='all'; fProduct.value='all'; buildTable(); });
+  </script>
+</body>
+</html>
